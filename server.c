@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <netdb.h>
-#include <netinet/in.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,7 +13,6 @@
 #define LISTEN_QUEUE_SIZE 20
 
 uint8_t get_protocol(const char *str);
-in_port_t get_port(const char *str);
 char *get_root_path(char *path);
 void debug_server_input(uint8_t protocol, char *port, char *path);
 int socket_new(const uint8_t protocol, const char *port);
@@ -45,7 +43,7 @@ int socket_new(const uint8_t protocol, const char *port) {
     // Provide hints for socket intialisation.
     struct addrinfo hints, *result;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = get_port(port) == 6 ? AF_INET6 : AF_INET;
+    hints.ai_family = protocol == 6 ? AF_INET6 : AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
     int s = getaddrinfo(NULL, port, &hints, &result);
@@ -106,16 +104,6 @@ uint8_t get_protocol(const char *str) {
         exit(EXIT_FAILURE);
     }
     return (uint8_t)val;
-}
-
-in_port_t get_port(const char *str) {
-    // Converts string to port number. Strict: exits if not a valid port number
-    unsigned long val = strtoul_strict(str);
-    if (val > UINT16_MAX) {
-        fprintf(stderr, "server: port number too large [0..65535].\n");
-        exit(EXIT_FAILURE);
-    }
-    return (in_port_t)val;
 }
 
 char *get_root_path(char *path) {
