@@ -1,22 +1,32 @@
 #define _POSIX_C_SOURCE 200112L
+
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 #include <netdb.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
+// Constants.
 #define LISTEN_QUEUE_SIZE 20
 
+// Function prototypes.
 uint8_t get_protocol(const char *str);
 char *get_root_path(char *path);
 void debug_server_input(uint8_t protocol, char *port, char *path);
 int socket_new(const uint8_t protocol, const char *port);
+static void termination_handler(int signum);
 
+// Signal status.
+volatile sig_atomic_t is_listening = true;
+
+// Functions.
 int main(int argc, char *argv[]) {
     // Read arguments. Can assume well-formed provided arguments.
     if (argc != 4) {
@@ -28,15 +38,38 @@ int main(int argc, char *argv[]) {
     char *s_root_path = get_root_path(argv[3]);
     // debug_server_input(s_protocol, s_port, s_root_path);
 
-    // Initialise listening socket
+    // Initialise listening socket.
     int sockfd = socket_new(s_protocol, s_port);
-    if (listen(sockfd, LISTEN_QUEUE_SIZE) < 0) {
-        perror("listen");
-        exit(EXIT_FAILURE);
+
+    // Register signal handler.
+    struct sigaction new_action;
+    new_action.sa_handler = termination_handler;
+    sigemptyset(&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction(SIGINT, &new_action, NULL);
+    sigaction(SIGTERM, &new_action, NULL);
+    sigaction(SIGHUP, &new_action, NULL);
+
+    // Accept connections
+    int client_sockfd;
+    struct sockaddr_storage client_addr;
+    socklen_t client_addr_size = sizeof(client_addr);
+    while (is_listening) {
+        client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_size);
+        if (client_sockfd < 0) {
+            // Could not accept: continue accepting other connections.
+            perror("accept");
+            continue;
+        }
     }
 
     close(sockfd);
     return 0;
+}
+
+static void termination_handler(int signum) {
+    is_listening = false;
+    return;
 }
 
 int socket_new(const uint8_t protocol, const char *port) {
@@ -72,6 +105,13 @@ int socket_new(const uint8_t protocol, const char *port) {
         exit(EXIT_FAILURE);
     }
     freeaddrinfo(result);
+
+    // Start listening.
+    if (listen(sockfd, LISTEN_QUEUE_SIZE) < 0) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+
     return sockfd;
 }
 
