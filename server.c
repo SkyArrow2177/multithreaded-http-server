@@ -149,18 +149,12 @@ uint8_t get_protocol(const char *str) {
 char *get_root_path(char *path) {
     // Check for existence of file
     DIR *root_dir = opendir(path);
-    bool is_valid = root_dir != NULL;
-    closedir(root_dir);
-    if (!is_valid) {
+    if (root_dir == NULL) {
         fprintf(stderr,
                 "server: root path does not exist. exiting early since no requests can be served at this root.\n");
         exit(EXIT_FAILURE);
     }
-    // Remove trailing slash.
-    size_t path_len = strlen(path);
-    if (path_len > 0 && path[path_len - 1] == '/') {
-        path[path_len - 1] = '\0';
-    }
+    closedir(root_dir);
     return path;
 }
 
