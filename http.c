@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -35,6 +36,8 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     // get full path.
     char *body_path = NULL;
     int path_len = get_path(path_root, uri, uri_len, body_path);
+    free(uri);
+    uri = NULL;
     if (path_len < 0) {
         // Prefer giving 404 over crashing or existing on malloc failure.
         return response_create_404();
@@ -43,6 +46,7 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     // attempt to open the file.
     int body_fd = get_body_fd(body_path);
     free(body_path);
+    body_path = NULL;
     if (body_fd < 0) {
         return response_create_404();
     }
@@ -51,7 +55,9 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     const char *mime = get_mime(uri);
 
     // craft response.
-    
+    response_t *res_ok = response_create_200(body_fd, mime);
+
+    return res_ok;
 }
 
 int get_request_uri(const char *request_buffer, char *uri_dest) {
