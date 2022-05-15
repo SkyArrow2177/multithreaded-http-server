@@ -18,7 +18,7 @@
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
 #define REQUEST_SIZE 2048
-#define RECV_TIMEOUT_SECS 20
+#define RECV_TIMEOUT_SECS 120
 
 // Function prototypes.
 uint8_t get_protocol(const char *str);
