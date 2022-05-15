@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
@@ -11,10 +12,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
+#define REQUEST_SIZE 2048
+#define RECV_TIMEOUT_SECS 20
 
 // Function prototypes.
 uint8_t get_protocol(const char *str);
@@ -50,6 +54,9 @@ int main(int argc, char *argv[]) {
     sigaction(SIGTERM, &new_action, NULL);
     sigaction(SIGHUP, &new_action, NULL);
 
+    // Initialise timeout instance to be used across all connections.
+    const struct timeval timeout = {.tv_sec = RECV_TIMEOUT_SECS, .tv_usec = 0};
+
     // Accept connections
     int client_sockfd;
     struct sockaddr_storage client_addr;
@@ -58,9 +65,35 @@ int main(int argc, char *argv[]) {
         client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_size);
         if (client_sockfd < 0) {
             // Could not accept: continue accepting other connections.
-            perror("accept");
+            if (is_listening) {
+                perror("accept");
+            }
             continue;
         }
+
+        // Set a timeout on the client socket. Should never error out.
+        if (setsockopt(client_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("setsockopt: client");
+            close(client_sockfd);
+            continue;
+        }
+
+        // Store received data in a buffer.
+        char buffer[REQUEST_SIZE + 1] = {'\0'};
+        char *res_path = NULL;
+        int count = 0, total = 0;
+        while ((count = recv(client_sockfd, &buffer[total], sizeof(buffer) - total, 0)) > 0) {
+            total += count;
+        }
+        if (count == -1) {
+            // Received an error with the socket - drop this client.
+            perror("recv");
+            close(client_sockfd);
+            continue;
+        }
+
+        assert(count == 0);
+        
     }
 
     close(sockfd);
