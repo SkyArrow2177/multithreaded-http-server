@@ -14,7 +14,7 @@ typedef struct response_t {
 
 response_t *response_create_404();
 
-response_t *response_create_200(int fd, char *mime);
+response_t *response_create_200(int fd, const char *mime);
 
 response_t *response_create_400();
 
