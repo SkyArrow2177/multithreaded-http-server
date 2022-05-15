@@ -14,6 +14,7 @@
 #define SP " "
 
 char HTTP_404_HEADER[] = HTTP_VERSION SP "404 Not Found" CRLF HTTP_CLENGTH_PREFIX SP "0" CRLF CRLF;
+char HTTP_400_HEADER[] = HTTP_VERSION SP "400 Bad Request" CRLF HTTP_CLENGTH_PREFIX SP "0" CRLF CRLF;
 const char HTTP_200_HEADER[] =
     HTTP_VERSION SP "200 OK" CRLF HTTP_CLENGTH_PREFIX SP "%zu" CRLF HTTP_CTYPE_PREFIX SP "%s" CRLF CRLF;
 
@@ -39,11 +40,23 @@ response_t *response_create_404() {
         return NULL;
     }
 
-    // Save headers only.
+    // Save header only.
     res->status = HTTP_404;
     res->header = HTTP_404_HEADER;
     res->header_size = strlen(res->header);
+    return res;
+}
 
+response_t *response_create_400() {
+    response_t *res = response_create();
+    if (res == NULL) {
+        return NULL;
+    }
+
+    // Save header only.
+    res->status = HTTP_400;
+    res->header = HTTP_400_HEADER;
+    res->header_size = strlen(res->header);
     return res;
 }
 
