@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=c99 -O2 -Wall -lpthread
+CFLAGS=-std=c99 -O2 -Wall -Werror=vla -lpthread
 
 server: server.c
 	$(CC) $(CFLAGS) -o server server.c
