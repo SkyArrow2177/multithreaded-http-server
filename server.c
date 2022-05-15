@@ -93,7 +93,8 @@ int main(int argc, char *argv[]) {
         }
 
         assert(count == 0);
-        
+
+        close(client_sockfd);
     }
 
     close(sockfd);
