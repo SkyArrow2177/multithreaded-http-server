@@ -1,12 +1,22 @@
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "http.h"
 #include "response.h"
 
 #define BAD_REQUEST -1
+#define NOT_FOUND_REQUEST -2
+#define MIME_MAP_LEN 4
+
+// Pre-computed mime map for simplicity and readibility.
+const char *mime_map[MIME_MAP_LEN][2] = {
+    {".html", "text/html"}, {".jpg", "image/jpeg"}, {".css", "text/css"}, {".js", "text/javascript"}};
+const char mime_default[] = "application/octet-stream";
 
 response_t *make_response(const char *path_root, const char *request_buffer) {
     // Get URI from a well-formed request-line.
@@ -22,6 +32,25 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
         return response_create_404();
     }
 
+    // get full path.
+    char *body_path = NULL;
+    int path_len = get_path(path_root, uri, uri_len, body_path);
+    if (path_len < 0) {
+        // Prefer giving 404 over crashing or existing on malloc failure.
+        return response_create_404();
+    }
+
+    // attempt to open the file.
+    int body_fd = get_body_fd(body_path);
+    free(body_path);
+    if (body_fd < 0) {
+        return response_create_404();
+    }
+
+    // get mime type.
+    const char *mime = get_mime(uri);
+
+    // craft response.
     
 }
 
@@ -91,4 +120,56 @@ bool uri_has_escape(const char *uri, int uri_len) {
     char *ret = strstr(uri, "/../");
     bool has_middle_escape = ret != NULL;
     return has_middle_escape;
+}
+
+const char *get_mime(const char *uri) {
+    // Guaranteed that uri contains at least one '/' since previous checks for abs_path have been done.
+    char *last_slash = strrchr(uri, '/');
+    char *last_dot = strrchr(uri, '.');
+
+    if (last_dot == NULL || last_slash > last_dot) {
+        return mime_default;
+    }
+
+    // Linear search is very fast due to high locality and lookup-table compiler optimizations.
+    for (int i = 0; i < MIME_MAP_LEN; i++) {
+        if (strcmp(last_dot, mime_map[i][0]) == 0) {
+            return mime_map[i][1];
+        }
+    }
+    return mime_default;
+}
+
+int get_path(const char *path_root, const char *uri, const int uri_len, char *path_dest) {
+    // Allocate full path
+    int path_len = strlen(path_root) + uri_len;
+    char *full_path = malloc(sizeof(*full_path) * (path_len + 1));
+    if (full_path == NULL) {
+        // This reeeeally shouldn't happen, but drop the request if necessary
+        perror("malloc: get_path");
+        return NOT_FOUND_REQUEST;
+    }
+    // Concat string. TODO: check if \0 is needed at the end.
+    strcpy(full_path, path_root);
+    strcat(full_path, uri);
+    path_dest = full_path;
+    return path_len;
+}
+
+int get_body_fd(const char *path) {
+    // Get file descriptor, if path points to a present filesystem location.
+    int body_fd = open(path, O_RDONLY);
+    if (body_fd < 0) {
+        return NOT_FOUND_REQUEST;
+    }
+
+    // Check if regular file (as opposed to directory or FIFO).
+    struct stat st;
+    fstat(body_fd, &st);
+    if (S_ISREG(st.st_mode)) {
+        return body_fd;
+    }
+    // Not a regular file: clean up file descriptor and prepare 404.
+    close(body_fd);
+    return NOT_FOUND_REQUEST;
 }
