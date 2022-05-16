@@ -1,5 +1,4 @@
 #define _POSIX_C_SOURCE 200112L
-
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -11,9 +10,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
+
+#include "http.h"
+#include "response.h"
 
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
@@ -80,12 +84,11 @@ int main(int argc, char *argv[]) {
 
         // Store received data in a buffer.
         char buffer[REQUEST_SIZE + 1] = {'\0'};
-        char *res_path = NULL;
         int count = 0, total = 0;
         while ((count = recv(client_sockfd, &buffer[total], sizeof(buffer) - total, 0)) > 0) {
             total += count;
         }
-        if (count == -1) {
+        if (count < 0) {
             // Received an error with the socket - drop this client.
             perror("recv");
             close(client_sockfd);
@@ -94,6 +97,46 @@ int main(int argc, char *argv[]) {
 
         assert(count == 0);
 
+        // Make response and free memory.
+        response_t *res = make_response(s_root_path, buffer);
+
+        // Send header to client.
+        int bytes_sent = 0, bytes_left = res->header_size, n;
+        while (bytes_sent < res->header_size) {
+            n = send(client_sockfd, res->header + bytes_sent, bytes_left, 0);
+            if (n < 0) {
+                perror("send: header error");
+                break;
+            }
+            bytes_sent += n;
+            bytes_left -= n;
+        }
+
+        // Send content only if sending headers was successful.
+        if (bytes_sent == res->header_size && res->body_size > 0) {
+            // Need to switch on either sending out a byte array (e.g. 400 message) or a file.
+            switch (res->status) {
+            case HTTP_200:
+                bytes_left = res->body_size;
+                off_t bytes_sent_offet = 0;
+                while (bytes_sent < res->body_size) {
+                    n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offet, bytes_left);
+                    if (n < 0) {
+                        perror("sendfile: 200 entity-body error");
+                        break;
+                    }
+                    bytes_sent_offet += n;
+                    bytes_left -= n;
+                }
+                break;
+            default:
+                // Other statuses have Content-Length: 0 for now.
+                break;
+            }
+        }
+
+        // Finished sending: free response and close the connection.
+        response_free(res);
         close(client_sockfd);
     }
 
