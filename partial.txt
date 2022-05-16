@@ -1,67 +1,79 @@
 Recv call: update buffer
 
 Variables:
-    Modes (enum)
-        1. prefix
-        2. uri + http version
-        3. got request, get file and mime type. 
-        4. bad request, return 400
-        5. path escape, return 404
+    Return values (enum)
+        1. still buffering
+        2. (nothing)
+        3. got request, get file and mime type.  (terminal)
+        4. bad request, return 400 (terminal)
+        5. path escape, return 404 (terminal)
     
     booleans and initial value: 
+        valid_method = false
         valid_uri = true
         valid_http_ver = false
 
+    pointers:
+        slash_ptr
+        space_ptr
+        
+
 Partial check:
-    if mode == 1:
+    if !valid_method:
         if len(buffer) >= len("GET /"):
             if strncmp(buffer, "GET /", 5) == 0:
-                 mode = 2
-                 slash_pointer = buffer+4
+                 valid_method = true
+                 slash_ptr = buffer+4
             else:
-                mode = 4
-                return
+                return 4
         else:
             if strncmp(buffer, "GET /", len(buffer)) == 0:
-                return (still mode 1)
+                return 1
             else:
-                mode = 4
-                return
+                return 4
 
 
-    if mode == 2:
-        space_ptr = strchr to find first space starting from / pointer.
-        if (space_ptr is not null):
+    if valid_method:
+        space_ptr = space_ptr or if currently null, strchr to find first space starting from slash_ptr.
+        if (valid_http_ver == false and space_ptr is not null):
             // Comparing " HTTP/1.0\r\n" with string starting from space_ptr
             // len(" HTTP/1.0\r\n") == 11
             if len(space_ptr) >= 11:
                 if strncmp(buffer, " HTTP/1.0\r\n", 11) == 0:
                     valid_http_ver = true
                 else:
-                    mode = 4
-                    return
+                    return 4
             else:
                 if strncmp(buffer, " HTTP/1.0\r\n", len(buffer)) == 0:
                     do nothing, just exit this if statement.
                 else:
-                    mode = 4
-                    return
+                    return 4
 
-        escape_ptr = strstr to find first /../ occurence starting from the slash pointer.
+        escape_ptr = strstr to find first /../ occurence starting from slash_ptr.
         if escape_ptr is not null and (space_ptr is null or escape_ptr < space_ptr):
-            mode = 5
             valid_uri = false
-            return
+            return 5
         
-        escape_ptr_ending = strstr "/.. " (include space) starting from the slash pointer.
+        escape_ptr_ending = strstr "/.. " (include space) starting from slash_ptr.
         if escape_ptr_ending is not null and (space_ptr is null or escape_ptr_ending < space_ptr):
-            mode 5
             valid_uri = false
-            return
+            return 5
 
         if valid_uri and valid_http_version:
-            mode = 3
-        return
+            return 3
+        
+        // Update the slash pointer to be at the end. 
+        if space_ptr is null:
+            // still in URI section: can just strrchr to find /.
+            slash_ptr = strrchr(buffer, '/')
+        else:
+            for (*p = space_ptr; p > slash_ptr; p--) {
+                if *p == '/':
+                    slash_ptr = p
+                    break
+            }
+
+        return 1
 
             
         
