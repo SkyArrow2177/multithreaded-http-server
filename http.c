@@ -20,7 +20,7 @@ const char mime_default[] = "application/octet-stream";
 
 response_t *make_response(const char *path_root, const char *request_buffer) {
     if (path_root == NULL || request_buffer == NULL) {
-        return response_create_400();
+        return NULL;
     }
 
     // Get URI from a well-formed request-line.
@@ -39,8 +39,6 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     // get full path.
     char *body_path = NULL;
     int path_len = get_path(path_root, uri, uri_len, &body_path);
-    free(uri);
-    uri = NULL;
     if (path_len < 0) {
         // Prefer giving 404 over crashing or existing on malloc failure.
         return response_create_404();
@@ -56,6 +54,8 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
 
     // get mime type.
     const char *mime = get_mime(uri);
+    free(uri);
+    uri = NULL;
 
     // craft response.
     response_t *res_ok = response_create_200(body_fd, mime);
