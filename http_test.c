@@ -30,6 +30,7 @@ void test_all_make_response() {
     const char r1_more_headers[] = "GET /comp30023-2022-project-2/.clang-format HTTP/1.0\r\nHost: "
                                    "cooltoastmemes.xyz\r\n\r\n"; // application/octet-stream:
                                                                  // 200
+    const char r6[] = "GET /comp30023-2022-project-2/.. HTTP/1.0\r\n";
 
     test_make_response(path_root, r1);
     test_make_response(path_root_trailing_slash, r1);
@@ -40,7 +41,7 @@ void test_all_make_response() {
     test_make_response(path_root, r3);
     test_make_response(path_root, r4);
     test_make_response(path_root, r5);
-
+    test_make_response(path_root, r6);
 }
 
 void test_make_response(const char *path_root, const char *request_buffer) {
