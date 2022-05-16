@@ -18,17 +18,15 @@ const char *mime_map[MIME_MAP_LEN][2] = {
     {".html", "text/html"}, {".jpg", "image/jpeg"}, {".css", "text/css"}, {".js", "text/javascript"}};
 const char mime_default[] = "application/octet-stream";
 
-int get_request_uri(const char *request_buffer, char *uri_dest);
-bool uri_has_escape(const char *uri, int uri_len);
-const char *get_mime(const char *uri);
-int get_path(const char *path_root, const char *uri, const int uri_len, char *path_dest);
-int get_body_fd(const char *path);
-
 response_t *make_response(const char *path_root, const char *request_buffer) {
+    if (path_root == NULL || request_buffer == NULL) {
+        return response_create_400();
+    }
+
     // Get URI from a well-formed request-line.
     // Allow for misformed headers to continue past this as long as the request-line is valid. Ed #887.
     char *uri = NULL;
-    int uri_len = get_request_uri(request_buffer, uri);
+    int uri_len = get_request_uri(request_buffer, &uri);
     if (uri_len == BAD_REQUEST) {
         return response_create_400();
     }
@@ -40,7 +38,7 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
 
     // get full path.
     char *body_path = NULL;
-    int path_len = get_path(path_root, uri, uri_len, body_path);
+    int path_len = get_path(path_root, uri, uri_len, &body_path);
     free(uri);
     uri = NULL;
     if (path_len < 0) {
@@ -65,7 +63,7 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     return res_ok;
 }
 
-int get_request_uri(const char *request_buffer, char *uri_dest) {
+int get_request_uri(const char *request_buffer, char **uri_dest) {
     // Check that the string starts with a GET method with an abs_path URI;
     char *line_start = strstr(request_buffer, "GET /");
     if (line_start != request_buffer) {
@@ -103,7 +101,7 @@ int get_request_uri(const char *request_buffer, char *uri_dest) {
     }
     strncpy(uri, uri_start, uri_len);
     uri[uri_len] = '\0';
-    uri_dest = uri;
+    *uri_dest = uri;
     return uri_len;
 }
 
@@ -151,7 +149,7 @@ const char *get_mime(const char *uri) {
     return mime_default;
 }
 
-int get_path(const char *path_root, const char *uri, const int uri_len, char *path_dest) {
+int get_path(const char *path_root, const char *uri, const int uri_len, char **path_dest) {
     // Allocate full path
     int path_len = strlen(path_root) + uri_len;
     char *full_path = malloc(sizeof(*full_path) * (path_len + 1));
@@ -163,7 +161,7 @@ int get_path(const char *path_root, const char *uri, const int uri_len, char *pa
     // Concat string. TODO: check if \0 is needed at the end.
     strcpy(full_path, path_root);
     strcat(full_path, uri);
-    path_dest = full_path;
+    *path_dest = full_path;
     return path_len;
 }
 
