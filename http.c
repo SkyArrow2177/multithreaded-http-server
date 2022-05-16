@@ -1,4 +1,3 @@
-#include <cstddef>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -18,6 +17,12 @@
 const char *mime_map[MIME_MAP_LEN][2] = {
     {".html", "text/html"}, {".jpg", "image/jpeg"}, {".css", "text/css"}, {".js", "text/javascript"}};
 const char mime_default[] = "application/octet-stream";
+
+int get_request_uri(const char *request_buffer, char *uri_dest);
+bool uri_has_escape(const char *uri, int uri_len);
+const char *get_mime(const char *uri);
+int get_path(const char *path_root, const char *uri, const int uri_len, char *path_dest);
+int get_body_fd(const char *path);
 
 response_t *make_response(const char *path_root, const char *request_buffer) {
     // Get URI from a well-formed request-line.
