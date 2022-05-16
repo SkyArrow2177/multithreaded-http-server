@@ -21,7 +21,7 @@
 
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
-#define REQUEST_SIZE 2048
+#define REQUEST_SIZE 8192
 #define RECV_TIMEOUT_SECS 120
 
 // Function prototypes.
@@ -84,10 +84,8 @@ int main(int argc, char *argv[]) {
 
         // Store received data in a buffer.
         char buffer[REQUEST_SIZE + 1] = {'\0'};
-        int count = 0, total = 0;
-        while ((count = recv(client_sockfd, &buffer[total], sizeof(buffer) - total, 0)) > 0) {
-            total += count;
-        }
+        int count, total = 0;
+        count = recv(client_sockfd, &buffer[total], sizeof(buffer) - total, 0);
         if (count < 0) {
             // Received an error with the socket - drop this client.
             perror("recv");
@@ -95,10 +93,16 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        assert(count == 0);
+        // assert(count == 0);
 
         // Make response and free memory.
         response_t *res = make_response(s_root_path, buffer);
+        if (res == NULL) {
+            // Occurs with malloc failure.
+            perror("null response");
+            close(client_sockfd);
+            continue;
+        }
 
         // Send header to client.
         int bytes_sent = 0, bytes_left = res->header_size, n;
@@ -119,7 +123,7 @@ int main(int argc, char *argv[]) {
             case HTTP_200:
                 bytes_left = res->body_size;
                 off_t bytes_sent_offet = 0;
-                while (bytes_sent < res->body_size) {
+                while (bytes_sent_offet < res->body_size) {
                     n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offet, bytes_left);
                     if (n < 0) {
                         perror("sendfile: 200 entity-body error");
