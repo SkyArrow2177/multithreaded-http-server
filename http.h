@@ -5,6 +5,18 @@
 
 #include "response.h"
 
+#define REQUEST_SIZE 2400
+
+enum request_stage_t { RECVING, VALID, BAD };
+typedef struct request_t {
+    char buffer[REQUEST_SIZE + 1];
+    char *slash_ptr;
+    char *last_ptr;
+    char *space_ptr;
+    bool has_valid_method;
+} request_t;
+
+enum request_stage_t process_partial_request(request_t *req);
 response_t *make_response(const char *path_root, const char *request_buffer);
 
 int get_request_uri(const char *request_buffer, char **uri_dest);

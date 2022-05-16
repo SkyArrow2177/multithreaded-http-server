@@ -24,7 +24,6 @@
 
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
-#define REQUEST_SIZE 8192
 #define RECV_TIMEOUT_SECS 120
 
 // Function prototypes.
@@ -86,9 +85,19 @@ int main(int argc, char *argv[]) {
         }
 
         // Store received data in a buffer.
-        char buffer[REQUEST_SIZE + 1] = {'\0'};
-        int count, total = 0;
-        count = recv(client_sockfd, &buffer[total], sizeof(buffer) - total, 0);
+        request_t req = {
+            .buffer = {'\0'}, .slash_ptr = NULL, .last_ptr = NULL, .space_ptr = NULL, .has_valid_method = false};
+
+        int count = 0, total = 0;
+        enum request_stage_t stage = BAD;
+        while ((count = recv(client_sockfd, &req.buffer[total], sizeof(req.buffer) - total - 1, 0)) > 0) {
+            total += count;
+            stage = process_partial_request(&req);
+            if (stage != RECVING) {
+                break;
+            }
+        }
+
         if (count < 0) {
             // Received an error with the socket - drop this client.
             perror("recv");
@@ -98,8 +107,8 @@ int main(int argc, char *argv[]) {
 
         // assert(count == 0);
 
-        // Make response and free memory.
-        response_t *res = make_response(s_root_path, buffer);
+        // Make response - if bad request or timed-out while still receiving, return 400 response.
+        response_t *res = stage == VALID ? make_response(s_root_path, req.buffer) : response_create_400();
         if (res == NULL) {
             // Occurs with malloc failure.
             perror("null response");

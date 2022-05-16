@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -12,11 +13,79 @@
 #define BAD_REQUEST -1
 #define NOT_FOUND_REQUEST -2
 #define MIME_MAP_LEN 4
+#define REQ_PREFIX "GET /"
+#define REQ_PREFIX_LEN 5
+#define REQ_HTTP10 " HTTP/1.0\r\n"
+#define REQ_HTTP11 " HTTP/1.1\r\n"
+#define REQ_HTTP_LEN 11
 
 // Pre-computed mime map for simplicity and readibility.
 const char *mime_map[MIME_MAP_LEN][2] = {
     {".html", "text/html"}, {".jpg", "image/jpeg"}, {".css", "text/css"}, {".js", "text/javascript"}};
 const char mime_default[] = "application/octet-stream";
+
+enum request_stage_t process_partial_request(request_t *req) {
+    printf("processing\n");
+
+    if (!req->has_valid_method) {
+        // Need to first process the GET method with the starting / in abs_path.
+        size_t buffer_len = strlen(req->buffer);
+        if (buffer_len >= REQ_PREFIX_LEN) {
+            // REQ_PREFIX must be a prefix of the buffer.
+            if (strncmp(req->buffer, REQ_PREFIX, REQ_PREFIX_LEN) == 0) {
+                // Proceed to checking checking for HTTP-Version
+                req->has_valid_method = true;
+                req->slash_ptr = req->buffer + REQ_PREFIX_LEN - 1;
+                req->last_ptr = req->buffer + REQ_PREFIX_LEN;
+            } else {
+                return BAD;
+            }
+
+        } else {
+            // The buffer is too small - but it must be a prefix of REQ_PREFIX.
+            if (strncmp(req->buffer, REQ_PREFIX, buffer_len) == 0) {
+                return RECVING;
+            } else {
+                return BAD;
+            }
+        }
+    }
+
+    assert(req->has_valid_method);
+    // The buffer is updated, so look for the first space
+    // starting from where we began filling the buffer this recv call.
+    if (req->space_ptr == NULL) {
+        req->space_ptr = strchr(req->last_ptr, ' ');
+    }
+
+    if (req->space_ptr == NULL) {
+        // Still couldn't find a space, update next recv's starting position.
+        req->last_ptr += strlen(req->last_ptr);
+        return RECVING;
+    }
+
+    size_t from_space_len = strlen(req->space_ptr);
+    if (from_space_len >= REQ_HTTP_LEN) {
+        // Must have entire HTTP-Version already in the buffer.
+        if (strncmp(req->space_ptr, REQ_HTTP10, REQ_HTTP_LEN) == 0 ||
+            strncmp(req->space_ptr, REQ_HTTP11, REQ_HTTP_LEN) == 0) {
+            return VALID;
+
+        } else {
+            return BAD;
+        }
+
+    } else {
+        // Check for partial prefix of HTTP-Version
+        if (strncmp(req->space_ptr, REQ_HTTP10, from_space_len) == 0 ||
+            strncmp(req->space_ptr, REQ_HTTP11, from_space_len) == 0) {
+            return RECVING;
+
+        } else {
+            return BAD;
+        }
+    }
+}
 
 response_t *make_response(const char *path_root, const char *request_buffer) {
     if (path_root == NULL || request_buffer == NULL) {
@@ -49,6 +118,8 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     free(body_path);
     body_path = NULL;
     if (body_fd < 0) {
+        free(uri);
+        uri = NULL;
         return response_create_404();
     }
 
