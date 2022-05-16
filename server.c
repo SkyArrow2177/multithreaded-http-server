@@ -19,6 +19,9 @@
 #include "http.h"
 #include "response.h"
 
+// Features:
+#define IMPLEMENTS_IPV6
+
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
 #define REQUEST_SIZE 8192

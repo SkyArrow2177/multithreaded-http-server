@@ -63,6 +63,7 @@ response_t *response_create_400() {
 response_t *response_create_200(int fd, const char *mime) {
     response_t *res = response_create();
     if (res == NULL) {
+        close(fd);
         return NULL;
     }
 
