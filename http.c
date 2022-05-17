@@ -10,7 +10,7 @@
 #include "http.h"
 #include "response.h"
 
-#define BAD_REQUEST -1
+#define GET_URI_FAILED -1
 #define NOT_FOUND_REQUEST -2
 #define MIME_MAP_LEN 4
 #define REQ_PREFIX "GET /"
@@ -99,7 +99,7 @@ response_t *make_response(const char *path_root, const request_t *req) {
     // Allow for misformed headers to continue past this as long as the request-line is valid. Ed #887.
     char *uri = NULL;
     int uri_len = get_request_uri(req, &uri);
-    if (uri_len == BAD_REQUEST) {
+    if (uri_len == GET_URI_FAILED) {
         return response_create_400();
     }
 
@@ -143,7 +143,7 @@ int get_request_uri(const request_t *req, char **uri_dest) {
     char *uri = malloc(sizeof(*uri) * (uri_len + 1));
     if (uri == NULL) {
         perror("malloc: get_request_uri");
-        return BAD_REQUEST;
+        return GET_URI_FAILED;
     }
     strncpy(uri, req->slash_ptr, uri_len);
     uri[uri_len] = '\0';
