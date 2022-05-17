@@ -1,0 +1,1 @@
+Should NOT lead to path escape (of the "/.. " trailing kind)

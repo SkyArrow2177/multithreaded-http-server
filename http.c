@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -12,21 +13,92 @@
 #define BAD_REQUEST -1
 #define NOT_FOUND_REQUEST -2
 #define MIME_MAP_LEN 4
+#define REQ_PREFIX "GET /"
+#define REQ_PREFIX_LEN 5
+#define REQ_HTTP10 " HTTP/1.0\r\n"
+#define REQ_HTTP11 " HTTP/1.1\r\n"
+#define REQ_HTTP_LEN 11
 
 // Pre-computed mime map for simplicity and readibility.
 const char *mime_map[MIME_MAP_LEN][2] = {
     {".html", "text/html"}, {".jpg", "image/jpeg"}, {".css", "text/css"}, {".js", "text/javascript"}};
 const char mime_default[] = "application/octet-stream";
 
-response_t *make_response(const char *path_root, const char *request_buffer) {
-    if (path_root == NULL || request_buffer == NULL) {
+enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) {
+    if (!req->has_valid_method) {
+        // Need to first process the GET method with the starting / in abs_path.
+        if (buffer_len >= REQ_PREFIX_LEN) {
+            // REQ_PREFIX must be a prefix of the buffer.
+            if (strncmp(req->buffer, REQ_PREFIX, REQ_PREFIX_LEN) == 0) {
+                // Proceed to checking checking for HTTP-Version
+                req->has_valid_method = true;
+                req->slash_ptr = req->buffer + REQ_PREFIX_LEN - 1;
+                req->last_ptr = req->buffer + REQ_PREFIX_LEN;
+            } else {
+                return BAD;
+            }
+
+        } else {
+            // The buffer is too small - but it must be a prefix of REQ_PREFIX.
+            if (strncmp(req->buffer, REQ_PREFIX, buffer_len) == 0) {
+                return RECVING;
+            } else {
+                return BAD;
+            }
+        }
+    }
+
+    assert(req->has_valid_method);
+    if (!req->has_valid_httpver) {
+        // The buffer is updated, so look for the first space
+        // starting from where we began filling the buffer this recv call.
+        if (req->space_ptr == NULL) {
+            req->space_ptr = strchr(req->last_ptr, ' ');
+        }
+
+        if (req->space_ptr == NULL) {
+            // Still couldn't find a space, update next recv's starting position and recv() until we can find a space.
+            req->last_ptr = req->buffer + buffer_len;
+            return RECVING;
+        }
+
+        size_t from_space_len = buffer_len - (req->space_ptr - req->buffer);
+        if (from_space_len >= REQ_HTTP_LEN) {
+            // Must have entire HTTP-Version followed by >= 1x CRLF already in the buffer.
+            if (strncmp(req->space_ptr, REQ_HTTP10, REQ_HTTP_LEN) == 0 ||
+                strncmp(req->space_ptr, REQ_HTTP11, REQ_HTTP_LEN) == 0) {
+                req->has_valid_httpver = true;
+
+            } else {
+                return BAD;
+            }
+
+        } else {
+            // Check for partial prefix of HTTP-Version
+            if (strncmp(req->space_ptr, REQ_HTTP10, from_space_len) == 0 ||
+                strncmp(req->space_ptr, REQ_HTTP11, from_space_len) == 0) {
+                return RECVING;
+
+            } else {
+                return BAD;
+            }
+        }
+    }
+    // Search for <CRLF><CRLF> (a strrstr implementation would be average-case faster but this is fine too).
+    assert(req->has_valid_method && req->has_valid_httpver && req->space_ptr != NULL);
+    char *end = strstr(req->space_ptr, "\r\n\r\n");
+    return end == NULL ? RECVING : VALID;
+}
+
+response_t *make_response(const char *path_root, const request_t *req) {
+    if (path_root == NULL || req == NULL) {
         return NULL;
     }
 
     // Get URI from a well-formed request-line.
     // Allow for misformed headers to continue past this as long as the request-line is valid. Ed #887.
     char *uri = NULL;
-    int uri_len = get_request_uri(request_buffer, &uri);
+    int uri_len = get_request_uri(req, &uri);
     if (uri_len == BAD_REQUEST) {
         return response_create_400();
     }
@@ -49,6 +121,8 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     free(body_path);
     body_path = NULL;
     if (body_fd < 0) {
+        free(uri);
+        uri = NULL;
         return response_create_404();
     }
 
@@ -63,43 +137,15 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     return res_ok;
 }
 
-int get_request_uri(const char *request_buffer, char **uri_dest) {
-    // Check that the string starts with a GET method with an abs_path URI;
-    char *line_start = strstr(request_buffer, "GET /");
-    if (line_start != request_buffer) {
-        return BAD_REQUEST;
-    }
-
-    // Check for CRLF in Request-Line.
-    char *first_crlf = strstr(request_buffer, "\r\n");
-    if (first_crlf == NULL) {
-        return BAD_REQUEST;
-    }
-
-    // Start at the path, look for HTTP version.
-    char *uri_start = line_start + 4;
-    char *uri_space_http10 = strstr(uri_start, " HTTP/1.0\r\n");
-    char *uri_space_http11 = strstr(uri_start, " HTTP/1.1\r\n");
-    char *uri_space_next = strchr(uri_start, ' ');
-
-    // We have a badly-formed Request-Line if we can't find HTTP-version,
-    // or if it is not in the first line
-    // or the next space does not also have HTTP after it.
-    bool http10_bad = uri_space_http10 == NULL || uri_space_next != uri_space_http10 || uri_space_http10 >= first_crlf;
-    bool http11_bad = uri_space_http11 == NULL || uri_space_next != uri_space_http11 || uri_space_http11 >= first_crlf;
-    if (http10_bad && http11_bad) {
-        return BAD_REQUEST;
-    }
-
+int get_request_uri(const request_t *req, char **uri_dest) {
     // Copy uri path to new array.
-    char *uri_space_http_any = http10_bad ? uri_space_http11 : uri_space_http10;
-    ssize_t uri_len = uri_space_http_any - uri_start;
+    ssize_t uri_len = req->space_ptr - req->slash_ptr;
     char *uri = malloc(sizeof(*uri) * (uri_len + 1));
     if (uri == NULL) {
         perror("malloc: get_request_uri");
         return BAD_REQUEST;
     }
-    strncpy(uri, uri_start, uri_len);
+    strncpy(uri, req->slash_ptr, uri_len);
     uri[uri_len] = '\0';
     *uri_dest = uri;
     return uri_len;
