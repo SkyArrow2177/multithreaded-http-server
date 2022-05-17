@@ -18,9 +18,9 @@ typedef struct request_t {
 } request_t;
 
 enum request_stage_t process_partial_request(request_t *req, size_t buffer_len);
-response_t *make_response(const char *path_root, const char *request_buffer);
+response_t *make_response(const char *path_root, const request_t *req);
 
-int get_request_uri(const char *request_buffer, char **uri_dest);
+int get_request_uri(const request_t *req, char **uri_dest);
 bool uri_has_escape(const char *uri, int uri_len);
 const char *get_mime(const char *uri);
 int get_path(const char *path_root, const char *uri, const int uri_len, char **path_dest);

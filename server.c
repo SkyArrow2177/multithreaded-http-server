@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
         // assert(count == 0);
 
         // Make response - if bad request, return 400 response.
-        response_t *res = stage == VALID ? make_response(s_root_path, req.buffer) : response_create_400();
+        response_t *res = stage == VALID ? make_response(s_root_path, &req) : response_create_400();
         if (res == NULL) {
             // Occurs with malloc failure.
             perror("null response");
