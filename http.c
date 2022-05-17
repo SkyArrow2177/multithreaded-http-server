@@ -25,8 +25,6 @@ const char *mime_map[MIME_MAP_LEN][2] = {
 const char mime_default[] = "application/octet-stream";
 
 enum request_stage_t process_partial_request(request_t *req) {
-    printf("processing\n");
-
     if (!req->has_valid_method) {
         // Need to first process the GET method with the starting / in abs_path.
         size_t buffer_len = strlen(req->buffer);
