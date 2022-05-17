@@ -1,2 +1,3 @@
 server
 http_test
+.venv/
