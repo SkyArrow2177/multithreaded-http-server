@@ -15,7 +15,7 @@ POST = "POST"
 FULL = "GET /special/..../example.html HTTP/1.0\r\n\r\n"
 LONG = "GET /special/..../example.html HTTP/1.0\r\nHost: abcdef.xyz\r\n\r\n"
 
-SKIP_TIMEOUT = True
+SKIP_TIMEOUT = False
 
 
 def ss():
@@ -27,7 +27,7 @@ def ss_timeout():
 
 
 def ncstart():
-    return nclib.Netcat(("localhost", PORT), verbose=False)
+    return nclib.Netcat(("localhost", PORT), verbose=True)
 
 
 class TestNetcat(unittest.TestCase):
@@ -218,6 +218,7 @@ class TestNetcat(unittest.TestCase):
         nc.recv()
         nc.close()
 
+    @unittest.skipIf(SKIP_TIMEOUT, "")
     def test_a5_200_TO_CHANGE_TO_400_TIMEOUT(self):
         nc = ncstart()
         nc.send(LONG[:2])
@@ -227,7 +228,7 @@ class TestNetcat(unittest.TestCase):
         nc.send(LONG[31:51])
 
         res = nc.recv()
-        self.status_in_header(HTTP_200_TEXT, res)
+        self.status_in_header(HTTP_400_TEXT, res)
 
         nc.recv()
         nc.close()
