@@ -1,4 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
+#include <asm-generic/errno-base.h>
+#include <asm-generic/errno.h>
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -24,7 +26,7 @@
 
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
-#define RECV_TIMEOUT_SECS 120
+#define RECV_TIMEOUT_SECS 10
 
 // Function prototypes.
 uint8_t get_protocol(const char *str);
@@ -98,8 +100,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (count < 0) {
-            // Received an error with the socket - drop this client.
+        if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            // Received an error with the socket that was NOT because of a timeout - drop this client.
             perror("recv");
             close(client_sockfd);
             continue;
@@ -107,7 +109,7 @@ int main(int argc, char *argv[]) {
 
         // assert(count == 0);
 
-        // Make response - if bad request or timed-out while still receiving, return 400 response.
+        // Make response - if bad request, return 400 response.
         response_t *res = stage == VALID ? make_response(s_root_path, req.buffer) : response_create_400();
         if (res == NULL) {
             // Occurs with malloc failure.
