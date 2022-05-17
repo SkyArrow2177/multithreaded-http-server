@@ -1,4 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
+#include <asm-generic/errno-base.h>
+#include <asm-generic/errno.h>
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -24,8 +26,7 @@
 
 // Constants.
 #define LISTEN_QUEUE_SIZE 20
-#define REQUEST_SIZE 8192
-#define RECV_TIMEOUT_SECS 120
+#define RECV_TIMEOUT_SECS 10
 
 // Function prototypes.
 uint8_t get_protocol(const char *str);
@@ -86,11 +87,25 @@ int main(int argc, char *argv[]) {
         }
 
         // Store received data in a buffer.
-        char buffer[REQUEST_SIZE + 1] = {'\0'};
-        int count, total = 0;
-        count = recv(client_sockfd, &buffer[total], sizeof(buffer) - total, 0);
-        if (count < 0) {
-            // Received an error with the socket - drop this client.
+        request_t req = {.buffer = {'\0'},
+                         .slash_ptr = NULL,
+                         .last_ptr = NULL,
+                         .space_ptr = NULL,
+                         .has_valid_method = false,
+                         .has_valid_httpver = false};
+
+        int count = 0, total = 0;
+        enum request_stage_t stage = BAD;
+        while ((count = recv(client_sockfd, &req.buffer[total], sizeof(req.buffer) - total - 1, 0)) > 0) {
+            total += count;
+            stage = process_partial_request(&req, total);
+            if (stage != RECVING) {
+                break;
+            }
+        }
+
+        if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            // Received an error with the socket that was NOT because of a timeout - drop this client.
             perror("recv");
             close(client_sockfd);
             continue;
@@ -98,8 +113,8 @@ int main(int argc, char *argv[]) {
 
         // assert(count == 0);
 
-        // Make response and free memory.
-        response_t *res = make_response(s_root_path, buffer);
+        // Make response - if bad request, return 400 response.
+        response_t *res = stage == VALID ? make_response(s_root_path, &req) : response_create_400();
         if (res == NULL) {
             // Occurs with malloc failure.
             perror("null response");
