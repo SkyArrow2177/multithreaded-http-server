@@ -90,15 +90,15 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
     return end == NULL ? RECVING : VALID;
 }
 
-response_t *make_response(const char *path_root, const char *request_buffer) {
-    if (path_root == NULL || request_buffer == NULL) {
+response_t *make_response(const char *path_root, const request_t *req) {
+    if (path_root == NULL || req == NULL) {
         return NULL;
     }
 
     // Get URI from a well-formed request-line.
     // Allow for misformed headers to continue past this as long as the request-line is valid. Ed #887.
     char *uri = NULL;
-    int uri_len = get_request_uri(request_buffer, &uri);
+    int uri_len = get_request_uri(req, &uri);
     if (uri_len == BAD_REQUEST) {
         return response_create_400();
     }
@@ -137,43 +137,15 @@ response_t *make_response(const char *path_root, const char *request_buffer) {
     return res_ok;
 }
 
-int get_request_uri(const char *request_buffer, char **uri_dest) {
-    // Check that the string starts with a GET method with an abs_path URI;
-    char *line_start = strstr(request_buffer, "GET /");
-    if (line_start != request_buffer) {
-        return BAD_REQUEST;
-    }
-
-    // Check for CRLF in Request-Line.
-    char *first_crlf = strstr(request_buffer, "\r\n");
-    if (first_crlf == NULL) {
-        return BAD_REQUEST;
-    }
-
-    // Start at the path, look for HTTP version.
-    char *uri_start = line_start + 4;
-    char *uri_space_http10 = strstr(uri_start, " HTTP/1.0\r\n");
-    char *uri_space_http11 = strstr(uri_start, " HTTP/1.1\r\n");
-    char *uri_space_next = strchr(uri_start, ' ');
-
-    // We have a badly-formed Request-Line if we can't find HTTP-version,
-    // or if it is not in the first line
-    // or the next space does not also have HTTP after it.
-    bool http10_bad = uri_space_http10 == NULL || uri_space_next != uri_space_http10 || uri_space_http10 >= first_crlf;
-    bool http11_bad = uri_space_http11 == NULL || uri_space_next != uri_space_http11 || uri_space_http11 >= first_crlf;
-    if (http10_bad && http11_bad) {
-        return BAD_REQUEST;
-    }
-
+int get_request_uri(const request_t *req, char **uri_dest) {
     // Copy uri path to new array.
-    char *uri_space_http_any = http10_bad ? uri_space_http11 : uri_space_http10;
-    ssize_t uri_len = uri_space_http_any - uri_start;
+    ssize_t uri_len = req->space_ptr - req->slash_ptr;
     char *uri = malloc(sizeof(*uri) * (uri_len + 1));
     if (uri == NULL) {
         perror("malloc: get_request_uri");
         return BAD_REQUEST;
     }
-    strncpy(uri, uri_start, uri_len);
+    strncpy(uri, req->slash_ptr, uri_len);
     uri[uri_len] = '\0';
     *uri_dest = uri;
     return uri_len;
