@@ -17,7 +17,7 @@ typedef struct request_t {
     bool has_valid_httpver;
 } request_t;
 
-enum request_stage_t process_partial_request(request_t *req);
+enum request_stage_t process_partial_request(request_t *req, size_t buffer_len);
 response_t *make_response(const char *path_root, const char *request_buffer);
 
 int get_request_uri(const char *request_buffer, char **uri_dest);
