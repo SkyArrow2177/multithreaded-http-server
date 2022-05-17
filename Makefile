@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=c99 -O2 -Wall -Werror=vla -lpthread
+CFLAGS=-std=c99 -O2 -Wall -Werror=vla -pthread
 
 server: server.c response.h response.c http.h http.c
 	$(CC) $(CFLAGS) -g -o server server.c response.h response.c http.h http.c
