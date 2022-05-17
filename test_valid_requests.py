@@ -75,9 +75,9 @@ class TestValidRequests(unittest.TestCase):
 
     def test_gif(self):
         req = Request(
-            path="/assets/office.gif",
+            path="/assets/bird.gif",
             code=HTTP_200,
-            size=8752538,
+            size=17306121,
             mime=MIME_DEF,
         )
         self.valid_helper(req)
