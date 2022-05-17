@@ -24,10 +24,9 @@ const char *mime_map[MIME_MAP_LEN][2] = {
     {".html", "text/html"}, {".jpg", "image/jpeg"}, {".css", "text/css"}, {".js", "text/javascript"}};
 const char mime_default[] = "application/octet-stream";
 
-enum request_stage_t process_partial_request(request_t *req) {
+enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) {
     if (!req->has_valid_method) {
         // Need to first process the GET method with the starting / in abs_path.
-        size_t buffer_len = strlen(req->buffer);
         if (buffer_len >= REQ_PREFIX_LEN) {
             // REQ_PREFIX must be a prefix of the buffer.
             if (strncmp(req->buffer, REQ_PREFIX, REQ_PREFIX_LEN) == 0) {
@@ -59,11 +58,11 @@ enum request_stage_t process_partial_request(request_t *req) {
 
         if (req->space_ptr == NULL) {
             // Still couldn't find a space, update next recv's starting position and recv() until we can find a space.
-            req->last_ptr += strlen(req->last_ptr);
+            req->last_ptr = req->buffer + buffer_len;
             return RECVING;
         }
 
-        size_t from_space_len = strlen(req->space_ptr);
+        size_t from_space_len = buffer_len - (req->space_ptr - req->buffer);
         if (from_space_len >= REQ_HTTP_LEN) {
             // Must have entire HTTP-Version followed by >= 1x CRLF already in the buffer.
             if (strncmp(req->space_ptr, REQ_HTTP10, REQ_HTTP_LEN) == 0 ||

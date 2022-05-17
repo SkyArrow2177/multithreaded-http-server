@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
         enum request_stage_t stage = BAD;
         while ((count = recv(client_sockfd, &req.buffer[total], sizeof(req.buffer) - total - 1, 0)) > 0) {
             total += count;
-            stage = process_partial_request(&req);
+            stage = process_partial_request(&req, total);
             if (stage != RECVING) {
                 break;
             }
