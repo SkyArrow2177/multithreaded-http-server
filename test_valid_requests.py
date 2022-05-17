@@ -7,24 +7,14 @@ import subprocess
 import time
 import requests
 
-IP_VER: int = 4
-PORT: int = 9000
-ROOT: str = "./www1"
-
-MIME_HTML = "text/html"
-MIME_JPEG = "image/jpeg"
-MIME_CSS = "text/css"
-MIME_JS = "text/javascript"
-MIME_DEF = "application/octet-stream"
-
-HTTP_200 = 200
-HTTP_400 = 400
-HTTP_404 = 404
+from test_env import *
 
 
 @dataclass
 class Request:
+    # Requested path
     path: str
+    # Expected values
     code: int
     size: int
     mime: Optional[str]
@@ -39,7 +29,7 @@ class TestValidRequests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.server = subprocess.Popen(
             [
-                "/home/k/compsys/comp30023-2022-project-2/server",
+                SERVER,
                 str(IP_VER),
                 str(PORT),
                 ROOT,
@@ -219,7 +209,6 @@ class TestValidRequests(unittest.TestCase):
         self.valid_helper(req)
 
     def test_long_path_200(self):
-        i = 250
         path_string = "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv/uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu/tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt/file"
         req = Request(
             path=path_string,
@@ -229,10 +218,19 @@ class TestValidRequests(unittest.TestCase):
         )
         self.valid_helper(req)
 
-    def valid_helper(self, req: Request):
+    def test_post_invalid_400(self):
+        req = Request(
+            path="/api/v1/playMusic",
+            code=HTTP_400,
+            size=0,
+            mime=None,
+        )
+        self.valid_helper(req, "POST")
+
+    def valid_helper(self, req: Request, method: str = "GET"):
         """Prepares requests for testing, ensuring that path escapes remain and are not normalized."""
         s = requests.Session()
-        req2 = requests.Request(method="GET", url=req.path)
+        req2 = requests.Request(method=method, url=req.path)
         req3 = req2.prepare()
         req3.url = req.path
         r = s.send(req3, verify=False)

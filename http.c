@@ -49,7 +49,7 @@ enum request_stage_t process_partial_request(request_t *req) {
         }
     }
 
-    assert(req->has_valid_method);
+    // assert(req->has_valid_method);
     // The buffer is updated, so look for the first space
     // starting from where we began filling the buffer this recv call.
     if (req->space_ptr == NULL) {
