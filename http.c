@@ -49,40 +49,46 @@ enum request_stage_t process_partial_request(request_t *req) {
         }
     }
 
-    // assert(req->has_valid_method);
-    // The buffer is updated, so look for the first space
-    // starting from where we began filling the buffer this recv call.
-    if (req->space_ptr == NULL) {
-        req->space_ptr = strchr(req->last_ptr, ' ');
-    }
-
-    if (req->space_ptr == NULL) {
-        // Still couldn't find a space, update next recv's starting position.
-        req->last_ptr += strlen(req->last_ptr);
-        return RECVING;
-    }
-
-    size_t from_space_len = strlen(req->space_ptr);
-    if (from_space_len >= REQ_HTTP_LEN) {
-        // Must have entire HTTP-Version already in the buffer.
-        if (strncmp(req->space_ptr, REQ_HTTP10, REQ_HTTP_LEN) == 0 ||
-            strncmp(req->space_ptr, REQ_HTTP11, REQ_HTTP_LEN) == 0) {
-            return VALID;
-
-        } else {
-            return BAD;
+    assert(req->has_valid_method);
+    if (!req->has_valid_httpver) {
+        // The buffer is updated, so look for the first space
+        // starting from where we began filling the buffer this recv call.
+        if (req->space_ptr == NULL) {
+            req->space_ptr = strchr(req->last_ptr, ' ');
         }
 
-    } else {
-        // Check for partial prefix of HTTP-Version
-        if (strncmp(req->space_ptr, REQ_HTTP10, from_space_len) == 0 ||
-            strncmp(req->space_ptr, REQ_HTTP11, from_space_len) == 0) {
+        if (req->space_ptr == NULL) {
+            // Still couldn't find a space, update next recv's starting position and recv() until we can find a space.
+            req->last_ptr += strlen(req->last_ptr);
             return RECVING;
+        }
+
+        size_t from_space_len = strlen(req->space_ptr);
+        if (from_space_len >= REQ_HTTP_LEN) {
+            // Must have entire HTTP-Version followed by >= 1x CRLF already in the buffer.
+            if (strncmp(req->space_ptr, REQ_HTTP10, REQ_HTTP_LEN) == 0 ||
+                strncmp(req->space_ptr, REQ_HTTP11, REQ_HTTP_LEN) == 0) {
+                req->has_valid_httpver = true;
+
+            } else {
+                return BAD;
+            }
 
         } else {
-            return BAD;
+            // Check for partial prefix of HTTP-Version
+            if (strncmp(req->space_ptr, REQ_HTTP10, from_space_len) == 0 ||
+                strncmp(req->space_ptr, REQ_HTTP11, from_space_len) == 0) {
+                return RECVING;
+
+            } else {
+                return BAD;
+            }
         }
     }
+    // Search for <CRLF><CRLF> (a strrstr implementation would be average-case faster but this is fine too).
+    assert(req->has_valid_method && req->has_valid_httpver && req->space_ptr != NULL);
+    char *end = strstr(req->space_ptr, "\r\n\r\n");
+    return end == NULL ? RECVING : VALID;
 }
 
 response_t *make_response(const char *path_root, const char *request_buffer) {

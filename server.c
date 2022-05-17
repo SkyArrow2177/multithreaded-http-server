@@ -87,8 +87,12 @@ int main(int argc, char *argv[]) {
         }
 
         // Store received data in a buffer.
-        request_t req = {
-            .buffer = {'\0'}, .slash_ptr = NULL, .last_ptr = NULL, .space_ptr = NULL, .has_valid_method = false};
+        request_t req = {.buffer = {'\0'},
+                         .slash_ptr = NULL,
+                         .last_ptr = NULL,
+                         .space_ptr = NULL,
+                         .has_valid_method = false,
+                         .has_valid_httpver = false};
 
         int count = 0, total = 0;
         enum request_stage_t stage = BAD;

@@ -14,6 +14,7 @@ typedef struct request_t {
     char *last_ptr;
     char *space_ptr;
     bool has_valid_method;
+    bool has_valid_httpver;
 } request_t;
 
 enum request_stage_t process_partial_request(request_t *req);
