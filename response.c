@@ -77,7 +77,7 @@ response_t *response_create_200(int fd, const char *mime) {
     res->body_size = st.st_size;
 
     // Format header in buffer of sufficient size.
-    ssize_t size_needed = snprintf(NULL, 0, HTTP_200_HEADER, st.st_size, mime);
+    int size_needed = snprintf(NULL, 0, HTTP_200_HEADER, st.st_size, mime);
     if (size_needed < 0) {
         perror("snprintf: response_create_200");
         free(res);

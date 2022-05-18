@@ -48,7 +48,7 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
         }
     }
 
-    assert(req->has_valid_method);
+    // assert(req->has_valid_method);
     if (!req->has_valid_httpver) {
         // The buffer is updated, so look for the first space
         // starting from where we began filling the buffer this recv call.
@@ -85,7 +85,7 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
         }
     }
     // Search for <CRLF><CRLF> (a strrstr implementation would be average-case faster but this is fine too).
-    assert(req->has_valid_method && req->has_valid_httpver && req->space_ptr != NULL);
+    // assert(req->has_valid_method && req->has_valid_httpver && req->space_ptr != NULL);
     char *end = strstr(req->space_ptr, "\r\n\r\n");
     return end == NULL ? RECVING : VALID;
 }
@@ -139,7 +139,7 @@ response_t *make_response(const char *path_root, const request_t *req) {
 
 int get_request_uri(const request_t *req, char **uri_dest) {
     // Copy uri path to new array.
-    ssize_t uri_len = req->space_ptr - req->slash_ptr;
+    int uri_len = req->space_ptr - req->slash_ptr;
     char *uri = malloc(sizeof(*uri) * (uri_len + 1));
     if (uri == NULL) {
         perror("malloc: get_request_uri");

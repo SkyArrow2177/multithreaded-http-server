@@ -151,11 +151,10 @@ void *client_thread(void *arg) {
     }
 
     // assert(count == 0);
-
     // Make response - if bad request, return 400 response.
     response_t *res = stage == VALID ? make_response(s_root_path, &req) : response_create_400();
     if (res == NULL) {
-        // Occurs with malloc failure.
+        // Occurs only with malloc failure.
         perror("null response");
         close(client_sockfd);
         return NULL;
@@ -179,14 +178,14 @@ void *client_thread(void *arg) {
         switch (res->status) {
         case HTTP_200:
             bytes_left = res->body_size;
-            off_t bytes_sent_offet = 0;
-            while (bytes_sent_offet < res->body_size) {
-                n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offet, bytes_left);
+            off_t bytes_sent_offset = 0;
+            while (bytes_sent_offset < res->body_size) {
+                n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offset, bytes_left);
                 if (n < 0) {
                     perror("sendfile: 200 entity-body error");
                     break;
                 }
-                bytes_sent_offet += n;
+                bytes_sent_offset += n;
                 bytes_left -= n;
             }
             break;
