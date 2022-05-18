@@ -1,11 +1,10 @@
 #define _POSIX_C_SOURCE 200112L
-#include <asm-generic/errno-base.h>
-#include <asm-generic/errno.h>
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 #include <netdb.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,7 +14,6 @@
 #include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include "http.h"
@@ -23,10 +21,20 @@
 
 // Features:
 #define IMPLEMENTS_IPV6
+#define MULTITHREADED
 
-// Constants.
+// Macro constants.
 #define LISTEN_QUEUE_SIZE 20
 #define RECV_TIMEOUT_SECS 10
+
+// Thread args
+typedef struct client_args_t {
+    int fd;
+    const char *root_path;
+} client_args_t;
+
+// Signal status.
+volatile sig_atomic_t is_listening = true;
 
 // Function prototypes.
 uint8_t get_protocol(const char *str);
@@ -34,9 +42,8 @@ char *get_root_path(char *path);
 void debug_server_input(uint8_t protocol, char *port, char *path);
 int socket_new(const uint8_t protocol, const char *port);
 static void termination_handler(int signum);
-
-// Signal status.
-volatile sig_atomic_t is_listening = true;
+client_args_t *client_args_create(int fd, const char *root_path);
+void *client_thread(void *arg);
 
 // Functions.
 int main(int argc, char *argv[]) {
@@ -65,6 +72,11 @@ int main(int argc, char *argv[]) {
     // Initialise timeout instance to be used across all connections.
     const struct timeval timeout = {.tv_sec = RECV_TIMEOUT_SECS, .tv_usec = 0};
 
+    // Define pthread attribute template to spawn pthreads detached.
+    pthread_attr_t thread_attr;
+    pthread_attr_init(&thread_attr);
+    pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+
     // Accept connections
     int client_sockfd;
     struct sockaddr_storage client_addr;
@@ -86,84 +98,119 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Store received data in a buffer.
-        request_t req = {.buffer = {'\0'},
-                         .slash_ptr = NULL,
-                         .last_ptr = NULL,
-                         .space_ptr = NULL,
-                         .has_valid_method = false,
-                         .has_valid_httpver = false};
-
-        int count = 0, total = 0;
-        enum request_stage_t stage = BAD;
-        while ((count = recv(client_sockfd, &req.buffer[total], sizeof(req.buffer) - total - 1, 0)) > 0) {
-            total += count;
-            stage = process_partial_request(&req, total);
-            if (stage != RECVING) {
-                break;
-            }
-        }
-
-        if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            // Received an error with the socket that was NOT because of a timeout - drop this client.
-            perror("recv");
+        client_args_t *client_args = client_args_create(client_sockfd, s_root_path);
+        if (!is_listening || client_args == NULL) {
             close(client_sockfd);
+            free(client_args);
             continue;
         }
 
-        // assert(count == 0);
-
-        // Make response - if bad request, return 400 response.
-        response_t *res = stage == VALID ? make_response(s_root_path, &req) : response_create_400();
-        if (res == NULL) {
-            // Occurs with malloc failure.
-            perror("null response");
+        pthread_t thread;
+        if (pthread_create(&thread, &thread_attr, client_thread, (void *)client_args) < 0) {
+            perror("pthread_create");
             close(client_sockfd);
-            continue;
+            free(client_args);
         }
-
-        // Send header to client.
-        int bytes_sent = 0, bytes_left = res->header_size, n;
-        while (bytes_sent < res->header_size) {
-            n = send(client_sockfd, res->header + bytes_sent, bytes_left, 0);
-            if (n < 0) {
-                perror("send: header error");
-                break;
-            }
-            bytes_sent += n;
-            bytes_left -= n;
-        }
-
-        // Send content only if sending headers was successful.
-        if (bytes_sent == res->header_size && res->body_size > 0) {
-            // Need to switch on either sending out a byte array (e.g. 400 message) or a file.
-            switch (res->status) {
-            case HTTP_200:
-                bytes_left = res->body_size;
-                off_t bytes_sent_offet = 0;
-                while (bytes_sent_offet < res->body_size) {
-                    n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offet, bytes_left);
-                    if (n < 0) {
-                        perror("sendfile: 200 entity-body error");
-                        break;
-                    }
-                    bytes_sent_offet += n;
-                    bytes_left -= n;
-                }
-                break;
-            default:
-                // Other statuses have Content-Length: 0 for now.
-                break;
-            }
-        }
-
-        // Finished sending: free response and close the connection.
-        response_free(res);
-        close(client_sockfd);
     }
 
+    // No longer listening, cleanup
+    pthread_attr_destroy(&thread_attr);
     close(sockfd);
     return 0;
+}
+
+void *client_thread(void *arg) {
+    client_args_t *client_args = (client_args_t *)arg;
+    int client_sockfd = client_args->fd;
+    const char *s_root_path = client_args->root_path;
+    free(client_args);
+
+    // Store received data in a buffer.
+    request_t req = {.buffer = {'\0'},
+                     .slash_ptr = NULL,
+                     .last_ptr = NULL,
+                     .space_ptr = NULL,
+                     .has_valid_method = false,
+                     .has_valid_httpver = false};
+
+    int count = 0, total = 0;
+    enum request_stage_t stage = BAD;
+    while ((count = recv(client_sockfd, &req.buffer[total], sizeof(req.buffer) - total - 1, 0)) > 0) {
+        total += count;
+        stage = process_partial_request(&req, total);
+        if (stage != RECVING) {
+            break;
+        }
+    }
+
+    if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        // Received an error with the socket that was NOT because of a timeout - drop this client.
+        perror("recv");
+        close(client_sockfd);
+        return NULL;
+    }
+
+    // assert(count == 0);
+
+    // Make response - if bad request, return 400 response.
+    response_t *res = stage == VALID ? make_response(s_root_path, &req) : response_create_400();
+    if (res == NULL) {
+        // Occurs with malloc failure.
+        perror("null response");
+        close(client_sockfd);
+        return NULL;
+    }
+
+    // Send header to client.
+    int bytes_sent = 0, bytes_left = res->header_size, n;
+    while (bytes_sent < res->header_size) {
+        n = send(client_sockfd, res->header + bytes_sent, bytes_left, 0);
+        if (n < 0) {
+            perror("send: header error");
+            break;
+        }
+        bytes_sent += n;
+        bytes_left -= n;
+    }
+
+    // Send content only if sending headers was successful.
+    if (bytes_sent == res->header_size && res->body_size > 0) {
+        // Need to switch on either sending out a byte array (e.g. 400 message) or a file.
+        switch (res->status) {
+        case HTTP_200:
+            bytes_left = res->body_size;
+            off_t bytes_sent_offet = 0;
+            while (bytes_sent_offet < res->body_size) {
+                n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offet, bytes_left);
+                if (n < 0) {
+                    perror("sendfile: 200 entity-body error");
+                    break;
+                }
+                bytes_sent_offet += n;
+                bytes_left -= n;
+            }
+            break;
+        default:
+            // Other statuses have Content-Length: 0 for now.
+            break;
+        }
+    }
+
+    // Finished sending: free response and close the connection.
+    response_free(res);
+    close(client_sockfd);
+    return NULL;
+}
+
+client_args_t *client_args_create(int fd, const char *root_path) {
+    client_args_t *args = malloc(sizeof(*args));
+    if (args == NULL) {
+        perror("client_args_create: malloc");
+        return NULL;
+    }
+    args->fd = fd;
+    args->root_path = root_path;
+    return args;
 }
 
 static void termination_handler(int signum) {
