@@ -100,6 +100,24 @@ class TestValidRequests(unittest.TestCase):
         )
         self.valid_helper(req)
 
+    def test_actually_application_octet_stream(self):
+        req = Request(
+            path="/special/html",
+            code=HTTP_200,
+            size=367,
+            mime=MIME_DEF,
+        )
+        self.valid_helper(req)
+
+    def test_actually_application_octet_stream_2(self):
+        req = Request(
+            path="/special/.__html",
+            code=HTTP_200,
+            size=375,
+            mime=MIME_DEF,
+        )
+        self.valid_helper(req)
+
     def test_file_404(self):
         req = Request(
             path="/assets/bababoowee.js",
