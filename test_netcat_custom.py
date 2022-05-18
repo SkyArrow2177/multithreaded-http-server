@@ -54,8 +54,10 @@ class TestNetcat(unittest.TestCase):
     def test_0_empty_timeout(self):
         nc = ncstart()
         nc.send("")
+
         res = nc.recv()
         self.status_in_header(HTTP_400_TEXT, res)
+
         nc.close()
 
     def test_1_ok(self):
@@ -151,7 +153,6 @@ class TestNetcat(unittest.TestCase):
         res = nc.recv()
         self.status_in_header(HTTP_400_TEXT, res)
 
-        nc.recv()
         nc.close()
 
     def test_9_invalid_prefix_and_slash(self):
@@ -159,7 +160,21 @@ class TestNetcat(unittest.TestCase):
         nc.send("GET #")
         ss()
         nc.send("speci")  # placing recv() before or after this will give the 400.
+
         res = nc.recv()
+        self.status_in_header(HTTP_400_TEXT, res)
+
+        nc.close()
+
+    def test_a0_garbage_prefix(self):
+        nc = ncstart()
+        nc.send("G")
+        ss()
+        nc.send("E ")
+
+        res = nc.recv()
+        self.status_in_header(HTTP_400_TEXT, res)
+
         nc.close()
 
     def test_a1_send_GE_then_space_then_not_HTTP(self):
@@ -173,7 +188,6 @@ class TestNetcat(unittest.TestCase):
         res = nc.recv()
         self.status_in_header(HTTP_400_TEXT, res)
 
-        nc.recv()
         nc.close()
 
     def test_a2_send_GE_then_HTTP_then_not_CR(self):
@@ -187,7 +201,6 @@ class TestNetcat(unittest.TestCase):
         res = nc.recv()
         self.status_in_header(HTTP_400_TEXT, res)
 
-        nc.recv()
         nc.close()
 
     def test_a3_send_GE_then_space_then_another_space_400(self):
@@ -201,7 +214,6 @@ class TestNetcat(unittest.TestCase):
         res = nc.recv()
         self.status_in_header(HTTP_400_TEXT, res)
 
-        nc.recv()
         nc.close()
 
     def test_a4_send_GE_then_CR_then_not_LF(self):
@@ -215,7 +227,6 @@ class TestNetcat(unittest.TestCase):
         res = nc.recv()
         self.status_in_header(HTTP_400_TEXT, res)
 
-        nc.recv()
         nc.close()
 
     @unittest.skipIf(SKIP_TIMEOUT, "")
@@ -230,7 +241,6 @@ class TestNetcat(unittest.TestCase):
         res = nc.recv()
         self.status_in_header(HTTP_400_TEXT, res)
 
-        nc.recv()
         nc.close()
 
     def test_a6_long_200(self):
