@@ -1,3 +1,5 @@
+# Unit tests for multi-packet request and malformed Request-Line behaviour, including timeouts.
+
 import signal
 import subprocess
 import nclib

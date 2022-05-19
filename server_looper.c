@@ -40,6 +40,9 @@ int send_header(response_t *res, int client_sockfd);
 off_t send_fd_file(response_t *res, int client_sockfd);
 void setup_signal_handling();
 
+// The main loop of the HTTP server.
+// All network-related system calls are orchestrated by functions in this file - this achieves good separation of
+// concerns. We handoff request data processing work to functions in other modules as necessary.
 int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path) {
     // Initialise listening socket.
     int sockfd = socket_new(s_protocol, s_port);
@@ -55,7 +58,7 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
     pthread_attr_init(&thread_attr);
     pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
 
-    // Accept connections
+    // Accept connections from clients
     int client_sockfd;
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
@@ -69,13 +72,14 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
             continue;
         }
 
-        // Set a timeout on the client socket. Should never error out.
+        // Set a receive timeout on the client socket before handing off to thread. Should never error out.
         if (setsockopt(client_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
             perror("setsockopt: client");
             close(client_sockfd);
             continue;
         }
 
+        // Prepare thread-local arguments for serving clients.
         client_args_t *client_args = client_args_create(client_sockfd, s_root_path);
         if (!is_listening || client_args == NULL) {
             close(client_sockfd);
@@ -83,6 +87,7 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
             continue;
         }
 
+        // Spawn a detached thread to receive and process a client request.
         pthread_t thread;
         if (pthread_create(&thread, &thread_attr, client_thread, (void *)client_args) < 0) {
             perror("pthread_create");
@@ -91,20 +96,22 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
         }
     }
 
-    // No longer listening, cleanup
+    // No longer listening, clean-up the server.
     pthread_attr_destroy(&thread_attr);
     close(sockfd);
 
     return 0;
 }
 
+// Thread function for receiving and processing client requests and orchestrating the delivery of responses.
 void *client_thread(void *arg) {
+    // Unwrap thread arguments.
     client_args_t *client_args = (client_args_t *)arg;
     int client_sockfd = client_args->fd;
     const char *s_root_path = client_args->root_path;
     free(client_args);
 
-    // Store received data in a buffer.
+    // Store received data in a buffer allocated on the stack for better locality and performance.
     request_t req = {.buffer = {'\0'},
                      .slash_ptr = NULL,
                      .last_ptr = NULL,
@@ -112,6 +119,8 @@ void *client_thread(void *arg) {
                      .has_valid_method = false,
                      .has_valid_httpver = false};
 
+    // Receive data from client on a loop, processing partial requests from multiple packets as soon as possible, and
+    // storing this in a request instance.
     int count = 0, total = 0;
     enum request_stage_t stage = BAD;
     while ((count = recv(client_sockfd, &req.buffer[total], sizeof(req.buffer) - total - 1, 0)) > 0) {
@@ -129,11 +138,11 @@ void *client_thread(void *arg) {
         return NULL;
     }
 
-    // assert(count == 0);
-    // Make response - if bad request, return 400 response.
+    // count may not necessarily be zero here - e.g. received bytes successfully but stage = BAD due to early
+    // elimination of a malformed request. Make response - if bad request, return 400 response.
     response_t *res = stage == VALID ? make_response(s_root_path, &req) : response_create_400();
     if (res == NULL) {
-        // Occurs only with malloc failure.
+        // Occurs only with malloc failure - drop the client.
         perror("null response");
         close(client_sockfd);
         return NULL;
@@ -143,7 +152,7 @@ void *client_thread(void *arg) {
     int bytes_sent = send_header(res, client_sockfd);
     // Send content only if sending headers was successful.
     if (bytes_sent == res->header_size && res->body_size > 0) {
-        // Need to switch on either sending out a byte array (e.g. 400 message) or a file.
+        // Switch on either sending out a byte array (e.g. 400 message with Entity-Body) or a file.
         switch (res->status) {
         case HTTP_200:
             send_fd_file(res, client_sockfd);
@@ -160,6 +169,8 @@ void *client_thread(void *arg) {
     return NULL;
 }
 
+// Send the content of a header to a client. int types are fine since the headers in the server's response are bounded
+// by the Linux absolute path limit of 4096 characters.
 int send_header(response_t *res, int client_sockfd) {
     int bytes_sent = 0, bytes_left = res->header_size, n;
     while (bytes_sent < res->header_size) {
@@ -174,6 +185,8 @@ int send_header(response_t *res, int client_sockfd) {
     return bytes_sent;
 }
 
+// Send binary file content to a client. On 64-bit systems and 32-bit systems with FILE_OFFSET_BITS=64 defined,
+// off_t, sendfile, open are automatically converted to their 64-bit versions, enabling Large File Support.
 off_t send_fd_file(response_t *res, int client_sockfd) {
     off_t bytes_sent_offset = 0L;
     off_t bytes_left = res->body_size;
@@ -181,13 +194,12 @@ off_t send_fd_file(response_t *res, int client_sockfd) {
     ssize_t n;
     while (bytes_sent_offset < res->body_size) {
         bytes_left = res->body_size - bytes_sent_offset;
-        // The narrower type for n and the limit of SSIZE_MAX is because sendfile can send at most SSIZE_MAX bytes per
-        // call.
+        // n's narrower type & the limit of SSIZE_MAX comes from sendfile sending at most SSIZE_MAX bytes per call.
         count = bytes_left > SSIZE_MAX ? SSIZE_MAX : bytes_left;
-        // Since sendfile updates the offset of the file descriptor, you should NOT pass in an offset variable,
+        // Since sendfile can update the offset of the file descriptor, you should NOT pass in an offset variable,
         // but instead let the offset be NULL. https://linux.die.net/man/2/sendfile
         // If you erroneously pass in an offset, you will notice that the returned bytes_send_offset will be double the
-        // correct value, but the actual offset used by sendfile will grow exponentially, leading to corruption errors.
+        // correct value, but the actual offset used by sendfile will grow exponentially, leading to failed downloads.
         n = sendfile(client_sockfd, res->body_fd, NULL, count);
         if (n <= 0) {
             perror("sendfile: 200 entity-body error");
@@ -198,6 +210,7 @@ off_t send_fd_file(response_t *res, int client_sockfd) {
     return bytes_sent_offset;
 }
 
+// Safely create the arguments for a thread.
 client_args_t *client_args_create(int fd, const char *root_path) {
     client_args_t *args = malloc(sizeof(*args));
     if (args == NULL) {
@@ -209,11 +222,13 @@ client_args_t *client_args_create(int fd, const char *root_path) {
     return args;
 }
 
+// Signal handler function for termination, which flips a flag.
 static void termination_handler(int signum) {
     is_listening = false;
     return;
 }
 
+// Registers signal handlers.
 void setup_signal_handling() {
     // Register signal handler for termination.
     struct sigaction new_action;
@@ -232,6 +247,7 @@ void setup_signal_handling() {
     sigaction(SIGPIPE, &ignored_signals, NULL);
 }
 
+// Establishes server socket for listening.
 int socket_new(const uint8_t protocol, const char *port) {
     // Provide hints for socket intialisation.
     struct addrinfo hints, *result;
@@ -245,9 +261,11 @@ int socket_new(const uint8_t protocol, const char *port) {
         exit(EXIT_FAILURE);
     }
 
+    // Bind and set socket to listen.
     struct addrinfo *p;
     int sockfd = -1;
     bool successful = false;
+    // Loop through to ensure that an address with the correct protocol version is used.
     for (p = result; (!successful) && (p != NULL); p = p->ai_next) {
         if (p->ai_family != hints.ai_family) {
             perror("protocol ai_family mismatch");
@@ -261,7 +279,7 @@ int socket_new(const uint8_t protocol, const char *port) {
             continue;
         }
 
-        // Attempt to reuse port.
+        // Attempt to reuse port. Required per Project 2 Specification.
         int enable = 1;
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
             perror("setsockopt");

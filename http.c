@@ -19,14 +19,25 @@
 #define REQ_HTTP11 " HTTP/1.1\r\n"
 #define REQ_HTTP_LEN 11
 
+// A HTTP Request parsing, processing, local file handling, and response construction library.
+
 // Pre-computed mime map for simplicity and readibility.
 const char *mime_map[MIME_MAP_LEN][2] = {
     {".html", "text/html"}, {".jpg", "image/jpeg"}, {".css", "text/css"}, {".js", "text/javascript"}};
 const char mime_default[] = "application/octet-stream";
 
+// Function prototypes
+int get_request_uri(const request_t *req, char **uri_dest);
+bool uri_has_escape(const char *uri, int uri_len);
+const char *get_mime(const char *uri);
+int get_path(const char *path_root, const char *uri, const int uri_len, char **path_dest);
+int get_body_fd(const char *path);
+
+// Process partial requests as they are updated on-the-fly, caching previous progress for improved performance.
 enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) {
+    // Step 1: finding the GET method with the starting / in abs_path.
     if (!req->has_valid_method) {
-        // Need to first process the GET method with the starting / in abs_path.
+        // We have not yet seen REQ_PREFIX.
         if (buffer_len >= REQ_PREFIX_LEN) {
             // REQ_PREFIX must be a prefix of the buffer.
             if (strncmp(req->buffer, REQ_PREFIX, REQ_PREFIX_LEN) == 0) {
@@ -39,7 +50,7 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
             }
 
         } else {
-            // The buffer is too small - but it must be a prefix of REQ_PREFIX.
+            // The buffer is too small - but it must be a prefix of REQ_PREFIX to continuing waiting for more data.
             if (strncmp(req->buffer, REQ_PREFIX, buffer_len) == 0) {
                 return RECVING;
             } else {
@@ -48,10 +59,12 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
         }
     }
 
+    // Step 2: have a valid method, now look for a valid HTTP version with CRLF.
     // assert(req->has_valid_method);
     if (!req->has_valid_httpver) {
-        // The buffer is updated, so look for the first space
-        // starting from where we began filling the buffer this recv call.
+        // The buffer is updated, so look for the first space starting from where we began filling the buffer this recv
+        // call. Since there one and only one space seen previously (in REQ_PREFIX), this would be the 2nd and last
+        // space of the Request-Line.
         if (req->space_ptr == NULL) {
             req->space_ptr = strchr(req->last_ptr, ' ');
         }
@@ -62,6 +75,7 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
             return RECVING;
         }
 
+        // Get the length from the space to the end of the string.
         size_t from_space_len = buffer_len - (req->space_ptr - req->buffer);
         if (from_space_len >= REQ_HTTP_LEN) {
             // Must have entire HTTP-Version followed by >= 1x CRLF already in the buffer.
@@ -85,11 +99,15 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
         }
     }
     // Search for <CRLF><CRLF> (a strrstr implementation would be average-case faster but this is fine too).
+    // Ed #948 was my question: https://edstem.org/au/courses/7916/discussion/864451?answer=1948422
+    // Going with [B], which requires 2x consecutive CRLF.
     // assert(req->has_valid_method && req->has_valid_httpver && req->space_ptr != NULL);
     char *end = strstr(req->space_ptr, "\r\n\r\n");
     return end == NULL ? RECVING : VALID;
 }
 
+// Given a valid processes request object, extract and validate its URI for additional rules (path escape),
+// open the file, get its mime, and build the response.
 response_t *make_response(const char *path_root, const request_t *req) {
     if (path_root == NULL || req == NULL) {
         return NULL;
@@ -137,6 +155,7 @@ response_t *make_response(const char *path_root, const request_t *req) {
     return res_ok;
 }
 
+// Gets the Request-Line URI given a processed request.
 int get_request_uri(const request_t *req, char **uri_dest) {
     // Copy uri path to new array.
     int uri_len = req->space_ptr - req->slash_ptr;
@@ -151,8 +170,8 @@ int get_request_uri(const request_t *req, char **uri_dest) {
     return uri_len;
 }
 
+// Takes two non-empty strings and returns true if str's suffix equals `suffix`.
 bool strsuffix(const char *str, size_t str_len, const char *suffix, size_t suffix_len) {
-    // Takes two non-empty strings and returns true if str's suffix equals `suffix`.
     if (str == NULL || suffix == NULL || str_len <= 0 || suffix_len <= 0) {
         return false;
     }
@@ -162,9 +181,8 @@ bool strsuffix(const char *str, size_t str_len, const char *suffix, size_t suffi
     return strncmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
 }
 
+// True: contains escape, hence is a bad request. False: no escape, OK to continue handling.
 bool uri_has_escape(const char *uri, int uri_len) {
-    // True: contains escape, hence is a bad request. False: no escape, OK to continue handling.
-
     // Check for trailing "/.." escape.
     bool has_trailing_escape = strsuffix(uri, uri_len, "/..", 3);
     if (has_trailing_escape) {
@@ -177,6 +195,7 @@ bool uri_has_escape(const char *uri, int uri_len) {
     return has_middle_escape;
 }
 
+// Gets the mime-type string literal for a valid URI.
 const char *get_mime(const char *uri) {
     // Guaranteed that uri contains at least one '/' since previous checks for abs_path have been done.
     char *last_slash = strrchr(uri, '/');
@@ -195,6 +214,7 @@ const char *get_mime(const char *uri) {
     return mime_default;
 }
 
+// Gets the full path to a resource.
 int get_path(const char *path_root, const char *uri, const int uri_len, char **path_dest) {
     // Allocate full path
     int path_len = strlen(path_root) + uri_len;
@@ -211,6 +231,7 @@ int get_path(const char *path_root, const char *uri, const int uri_len, char **p
     return path_len;
 }
 
+// Open and return a handle to an existing file.
 int get_body_fd(const char *path) {
     // Get file descriptor, if path points to a present filesystem location.
     int body_fd = open(path, O_RDONLY);

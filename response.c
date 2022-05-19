@@ -12,13 +12,19 @@
 #define HTTP_CTYPE_PREFIX "Content-Type:"
 #define SP " "
 
+// Response objects which encapsulate all the data necessary for the server to form a request to be directly written
+// back to a client. This ensures separation of concerns by letting one module handle all system calls, and another
+// module handle request string processing.
+
+// Header string templates.
 char HTTP_404_HEADER[] = HTTP_VERSION SP "404 Not Found" CRLF HTTP_CLENGTH_PREFIX SP "0" CRLF CRLF;
 char HTTP_400_HEADER[] = HTTP_VERSION SP "400 Bad Request" CRLF HTTP_CLENGTH_PREFIX SP "0" CRLF CRLF;
 const char HTTP_200_HEADER[] =
     HTTP_VERSION SP "200 OK" CRLF HTTP_CLENGTH_PREFIX SP "%zu" CRLF HTTP_CTYPE_PREFIX SP "%s" CRLF CRLF;
 
+// Initialise a defaulted builder response.
 static response_t *response_create() {
-    // Intialisation for response.
+    // Heap allocation
     response_t *res = malloc(sizeof(*res));
     if (res == NULL) {
         return NULL;
@@ -33,6 +39,7 @@ static response_t *response_create() {
     return res;
 }
 
+// Create a 404 response
 response_t *response_create_404() {
     response_t *res = response_create();
     if (res == NULL) {
@@ -46,6 +53,7 @@ response_t *response_create_404() {
     return res;
 }
 
+// Create a 400 response
 response_t *response_create_400() {
     response_t *res = response_create();
     if (res == NULL) {
@@ -59,6 +67,7 @@ response_t *response_create_400() {
     return res;
 }
 
+// Create a 200 response. Creates header and stores file descriptor and mime-type.
 response_t *response_create_200(int fd, const char *mime) {
     response_t *res = response_create();
     if (res == NULL) {
@@ -99,6 +108,8 @@ response_t *response_create_200(int fd, const char *mime) {
     return res;
 }
 
+// Frees a response object, including freeing heap-allocated headers and closing files, based on the status code of the
+// response.
 void response_free(response_t *res) {
     if (res == NULL) {
         return;

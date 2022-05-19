@@ -34,11 +34,14 @@ int main(int argc, char *argv[]) {
 }
 
 unsigned long strtoul_strict(const char *str) {
-    // Converts string to unsigned long. Strict: exits if string cannot be fully represented as a long.
+    // Converts string to unsigned long with error checking.
+    // Strict: exits if string cannot be fully represented as a long.
     const int base = 10;
     errno = 0;
     char *endptr;
     unsigned long val = strtoul(str, &endptr, base);
+
+    // Error scenarios are described at https://man7.org/linux/man-pages/man3/strtoul.3.html
     if ((errno == ERANGE && (val == ULONG_MAX || val == 0)) || (errno != 0 && val == 0)) {
         perror("strtoul_strict");
         exit(EXIT_FAILURE);
@@ -56,6 +59,7 @@ unsigned long strtoul_strict(const char *str) {
 
 uint8_t get_protocol(const char *str) {
     // Converts string to ip protocol. Strict: exits if not a supported IP protocol.
+    // uint8_t: a more compact representation, although an enum is also a decent solution.
     unsigned long val = strtoul_strict(str);
     if (val != 4 && val != 6) {
         fprintf(stderr, "server: not a supported protocol [4 | 6].\n");
@@ -65,7 +69,8 @@ uint8_t get_protocol(const char *str) {
 }
 
 char *get_root_path(char *path) {
-    // Check for existence of file
+    // Check for existence of directory. Supports relative paths prefixed witih './'.
+    // Does not copy the null-terminated string.
     DIR *root_dir = opendir(path);
     if (root_dir == NULL) {
         fprintf(stderr,
