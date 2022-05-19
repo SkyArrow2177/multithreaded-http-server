@@ -1,3 +1,5 @@
+# Environment variables and constants for automated server spawning and running unit tests.
+
 SERVER: str = "./server"
 IP_VER: int = 4
 PORT: int = 9000
