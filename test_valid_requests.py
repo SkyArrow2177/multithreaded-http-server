@@ -82,6 +82,24 @@ class TestValidRequests(unittest.TestCase):
         )
         self.valid_helper(req)
 
+    def test_large_1(self):
+        req = Request(
+            path="/suisei.mp4",
+            code=HTTP_200,
+            size=1362886656,
+            mime=MIME_DEF,
+        )
+        self.valid_helper(req)
+
+    def test_large_2(self):
+        req = Request(
+            path="/suisei2.mp4",
+            code=HTTP_200,
+            size=2146088452,
+            mime=MIME_DEF,
+        )
+        self.valid_helper(req)
+
     def test_multi_dot_file(self):
         req = Request(
             path="/telephone.clang-format.css.html.js.jpg",

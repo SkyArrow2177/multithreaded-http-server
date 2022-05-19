@@ -9,7 +9,7 @@ typedef struct response_t {
     char *body_buffer;
     int body_fd;
     size_t header_size;
-    size_t body_size;
+    off_t body_size;
 } response_t;
 
 response_t *response_create_404();
