@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <netdb.h>
 #include <pthread.h>
 #include <signal.h>
@@ -145,7 +146,6 @@ void *client_thread(void *arg) {
 
     // Send header to client.
     int bytes_sent = send_header(res, client_sockfd);
-
     // Send content only if sending headers was successful.
     if (bytes_sent == res->header_size && res->body_size > 0) {
         // Need to switch on either sending out a byte array (e.g. 400 message) or a file.
@@ -180,16 +180,25 @@ int send_header(response_t *res, int client_sockfd) {
 }
 
 off_t send_fd_file(response_t *res, int client_sockfd) {
-    off_t bytes_sent_offset = 0;
-    int bytes_left = res->body_size, n;
+    off_t bytes_sent_offset = 0L;
+    off_t bytes_left = res->body_size;
+    size_t count;
+    ssize_t n;
     while (bytes_sent_offset < res->body_size) {
-        n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offset, bytes_left);
-        if (n < 0) {
+        bytes_left = res->body_size - bytes_sent_offset;
+        // The narrower type for n and the limit of SSIZE_MAX is because sendfile can send at most SSIZE_MAX bytes per
+        // call.
+        count = bytes_left > SSIZE_MAX ? SSIZE_MAX : bytes_left;
+        // Since sendfile updates the offset of the file descriptor, you should NOT pass in an offset variable,
+        // but instead let the offset be NULL. https://linux.die.net/man/2/sendfile
+        // If you erroneously pass in an offset, you will notice that the returned bytes_send_offset will be double the
+        // correct value, but the actual offset used by sendfile will grow exponentially, leading to corruption errors.
+        n = sendfile(client_sockfd, res->body_fd, NULL, count);
+        if (n <= 0) {
             perror("sendfile: 200 entity-body error");
             break;
         }
         bytes_sent_offset += n;
-        bytes_left -= n;
     }
     return bytes_sent_offset;
 }
