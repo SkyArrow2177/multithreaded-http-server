@@ -2,3 +2,5 @@ server
 http_test
 .venv/
 __pycache__
+www1/movie3.mkv
+www1/movie5.mkv
