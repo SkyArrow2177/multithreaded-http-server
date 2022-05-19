@@ -18,6 +18,13 @@
 #define REQ_HTTP10 " HTTP/1.0\r\n"
 #define REQ_HTTP11 " HTTP/1.1\r\n"
 #define REQ_HTTP_LEN 11
+#define CRLF "\r\n"
+#define SP_CHAR ' '
+#define PATH_ESCAPE "/../"
+#define PATH_ESCAPE_TRAILING "/.."
+#define PATH_ESCAPE_TRAILING_LEN 3
+#define SLASH_CHAR '/'
+#define DOT_CHAR '.'
 
 // A HTTP Request parsing, processing, local file handling, and response construction library.
 
@@ -66,7 +73,7 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
         // call. Since there one and only one space seen previously (in REQ_PREFIX), this would be the 2nd and last
         // space of the Request-Line.
         if (req->space_ptr == NULL) {
-            req->space_ptr = strchr(req->last_ptr, ' ');
+            req->space_ptr = strchr(req->last_ptr, SP_CHAR);
         }
 
         if (req->space_ptr == NULL) {
@@ -102,7 +109,7 @@ enum request_stage_t process_partial_request(request_t *req, size_t buffer_len) 
     // Ed #948 was my question: https://edstem.org/au/courses/7916/discussion/864451?answer=1948422
     // Going with [B], which requires 2x consecutive CRLF.
     // assert(req->has_valid_method && req->has_valid_httpver && req->space_ptr != NULL);
-    char *end = strstr(req->space_ptr, "\r\n\r\n");
+    char *end = strstr(req->space_ptr, CRLF CRLF);
     return end == NULL ? RECVING : VALID;
 }
 
@@ -184,13 +191,13 @@ bool strsuffix(const char *str, size_t str_len, const char *suffix, size_t suffi
 // True: contains escape, hence is a bad request. False: no escape, OK to continue handling.
 bool uri_has_escape(const char *uri, int uri_len) {
     // Check for trailing "/.." escape.
-    bool has_trailing_escape = strsuffix(uri, uri_len, "/..", 3);
+    bool has_trailing_escape = strsuffix(uri, uri_len, PATH_ESCAPE_TRAILING, PATH_ESCAPE_TRAILING_LEN);
     if (has_trailing_escape) {
         return true;
     }
 
     // Check for /../ (No need to check for leading ../ since abs_path must begin with /).
-    char *ret = strstr(uri, "/../");
+    char *ret = strstr(uri, PATH_ESCAPE);
     bool has_middle_escape = ret != NULL;
     return has_middle_escape;
 }
@@ -198,8 +205,8 @@ bool uri_has_escape(const char *uri, int uri_len) {
 // Gets the mime-type string literal for a valid URI.
 const char *get_mime(const char *uri) {
     // Guaranteed that uri contains at least one '/' since previous checks for abs_path have been done.
-    char *last_slash = strrchr(uri, '/');
-    char *last_dot = strrchr(uri, '.');
+    char *last_slash = strrchr(uri, SLASH_CHAR);
+    char *last_dot = strrchr(uri, DOT_CHAR);
 
     if (last_dot == NULL || last_slash > last_dot) {
         return mime_default;
