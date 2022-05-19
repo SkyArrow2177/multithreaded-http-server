@@ -35,6 +35,8 @@ int socket_new(const uint8_t protocol, const char *port);
 static void termination_handler(int signum);
 client_args_t *client_args_create(int fd, const char *root_path);
 void *client_thread(void *arg);
+int send_header(response_t *res, int client_sockfd);
+off_t send_fd_file(response_t *res, int client_sockfd);
 
 int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path) {
     // Initialise listening socket.
@@ -142,33 +144,14 @@ void *client_thread(void *arg) {
     }
 
     // Send header to client.
-    int bytes_sent = 0, bytes_left = res->header_size, n;
-    while (bytes_sent < res->header_size) {
-        n = send(client_sockfd, res->header + bytes_sent, bytes_left, 0);
-        if (n < 0) {
-            perror("send: header error");
-            break;
-        }
-        bytes_sent += n;
-        bytes_left -= n;
-    }
+    int bytes_sent = send_header(res, client_sockfd);
 
     // Send content only if sending headers was successful.
     if (bytes_sent == res->header_size && res->body_size > 0) {
         // Need to switch on either sending out a byte array (e.g. 400 message) or a file.
         switch (res->status) {
         case HTTP_200:
-            bytes_left = res->body_size;
-            off_t bytes_sent_offset = 0;
-            while (bytes_sent_offset < res->body_size) {
-                n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offset, bytes_left);
-                if (n < 0) {
-                    perror("sendfile: 200 entity-body error");
-                    break;
-                }
-                bytes_sent_offset += n;
-                bytes_left -= n;
-            }
+            send_fd_file(res, client_sockfd);
             break;
         default:
             // Other statuses have Content-Length: 0 for now.
@@ -180,6 +163,35 @@ void *client_thread(void *arg) {
     response_free(res);
     close(client_sockfd);
     return NULL;
+}
+
+int send_header(response_t *res, int client_sockfd) {
+    int bytes_sent = 0, bytes_left = res->header_size, n;
+    while (bytes_sent < res->header_size) {
+        n = send(client_sockfd, res->header + bytes_sent, bytes_left, 0);
+        if (n < 0) {
+            perror("send: header error");
+            break;
+        }
+        bytes_sent += n;
+        bytes_left -= n;
+    }
+    return bytes_sent;
+}
+
+off_t send_fd_file(response_t *res, int client_sockfd) {
+    off_t bytes_sent_offset = 0;
+    int bytes_left = res->body_size, n;
+    while (bytes_sent_offset < res->body_size) {
+        n = sendfile(client_sockfd, res->body_fd, &bytes_sent_offset, bytes_left);
+        if (n < 0) {
+            perror("sendfile: 200 entity-body error");
+            break;
+        }
+        bytes_sent_offset += n;
+        bytes_left -= n;
+    }
+    return bytes_sent_offset;
 }
 
 client_args_t *client_args_create(int fd, const char *root_path) {
