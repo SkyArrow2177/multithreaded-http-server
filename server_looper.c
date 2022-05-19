@@ -212,32 +212,52 @@ int socket_new(const uint8_t protocol, const char *port) {
         exit(EXIT_FAILURE);
     }
 
-    // Create a socket for listening
-    int sockfd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-    if (sockfd < 0) {
-        perror("socket");
-        exit(EXIT_FAILURE);
+    struct addrinfo *p;
+    int sockfd = -1;
+    bool successful = false;
+    for (p = result; (!successful) && (p != NULL); p = p->ai_next) {
+        if (p->ai_family != hints.ai_family) {
+            perror("protocol ai_family mismatch");
+            continue;
+        }
+
+        // Open socket file descriptor.
+        sockfd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+        if (sockfd < 0) {
+            perror("socket");
+            continue;
+        }
+
+        // Attempt to reuse port.
+        int enable = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
+            perror("setsockopt");
+            close(sockfd);
+            continue;
+        }
+
+        // Bind address to socket.
+        if (bind(sockfd, result->ai_addr, result->ai_addrlen) < 0) {
+            perror("bind");
+            close(sockfd);
+            continue;
+        }
+
+        // Begin listening.
+        if (listen(sockfd, LISTEN_QUEUE_SIZE) < 0) {
+            perror("listen");
+            close(sockfd);
+            continue;
+        }
+
+        // Successfully started listening: choose the first address.
+        successful = true;
     }
 
-    // Attempt to reuse port.
-    int enable = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
-    }
-
-    // Bind address to socket.
-    if (bind(sockfd, result->ai_addr, result->ai_addrlen) < 0) {
-        perror("bind");
-        exit(EXIT_FAILURE);
-    }
     freeaddrinfo(result);
-
-    // Start listening.
-    if (listen(sockfd, LISTEN_QUEUE_SIZE) < 0) {
-        perror("listen");
+    if (!successful || sockfd < 0) {
+        perror("could not listen on any port");
         exit(EXIT_FAILURE);
     }
-
     return sockfd;
 }
