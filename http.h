@@ -1,7 +1,8 @@
 #ifndef HTTP_H
 #define HTTP_H
 
-#include "stdbool.h"
+#include <stdbool.h>
+#include <stddef.h>
 
 #include "response.h"
 
