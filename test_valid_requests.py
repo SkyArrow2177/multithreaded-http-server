@@ -9,6 +9,8 @@ import requests
 
 from test_env import *
 
+SKIP_LARGE_FILES = True
+
 
 @dataclass
 class Request:
@@ -82,6 +84,7 @@ class TestValidRequests(unittest.TestCase):
         )
         self.valid_helper(req)
 
+    @unittest.skipIf(SKIP_LARGE_FILES, "")
     def test_large_1(self):
         req = Request(
             path="/suisei.mp4",
@@ -91,6 +94,7 @@ class TestValidRequests(unittest.TestCase):
         )
         self.valid_helper(req)
 
+    @unittest.skipIf(SKIP_LARGE_FILES, "")
     def test_large_2(self):
         req = Request(
             path="/suisei2.mp4",

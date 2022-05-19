@@ -38,19 +38,14 @@ client_args_t *client_args_create(int fd, const char *root_path);
 void *client_thread(void *arg);
 int send_header(response_t *res, int client_sockfd);
 off_t send_fd_file(response_t *res, int client_sockfd);
+void setup_signal_handling();
 
 int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path) {
     // Initialise listening socket.
     int sockfd = socket_new(s_protocol, s_port);
 
-    // Register signal handler.
-    struct sigaction new_action;
-    new_action.sa_handler = termination_handler;
-    sigemptyset(&new_action.sa_mask);
-    new_action.sa_flags = 0;
-    sigaction(SIGINT, &new_action, NULL);
-    sigaction(SIGTERM, &new_action, NULL);
-    sigaction(SIGHUP, &new_action, NULL);
+    // Register termination upon SIGINT and SIGTERM, and ignore SIGPIPE from clients.
+    setup_signal_handling();
 
     // Initialise timeout instance to be used across all connections.
     const struct timeval timeout = {.tv_sec = RECV_TIMEOUT_SECS, .tv_usec = 0};
@@ -217,6 +212,24 @@ client_args_t *client_args_create(int fd, const char *root_path) {
 static void termination_handler(int signum) {
     is_listening = false;
     return;
+}
+
+void setup_signal_handling() {
+    // Register signal handler for termination.
+    struct sigaction new_action;
+    new_action.sa_handler = termination_handler;
+    sigemptyset(&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction(SIGINT, &new_action, NULL);
+    sigaction(SIGTERM, &new_action, NULL);
+    sigaction(SIGHUP, &new_action, NULL);
+
+    // Ignore SIGPIPE (e.g. from a curl client sending Ctrl-C).
+    struct sigaction ignored_signals;
+    ignored_signals.sa_handler = SIG_IGN;
+    sigemptyset(&ignored_signals.sa_mask);
+    ignored_signals.sa_flags = 0;
+    sigaction(SIGPIPE, &ignored_signals, NULL);
 }
 
 int socket_new(const uint8_t protocol, const char *port) {
