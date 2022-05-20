@@ -42,7 +42,8 @@ void setup_signal_handling();
 
 // The main loop of the HTTP server.
 // All network-related system calls are orchestrated by functions in this file - this achieves good separation of
-// concerns. We handoff request data processing work to functions in other modules as necessary.
+// concerns. We handoff request data processing work to functions in other modules as necessary. sendfile() benefits
+// are described at the call site.
 int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path) {
     // Initialise listening socket.
     int sockfd = socket_new(s_protocol, s_port);
@@ -50,10 +51,10 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
     // Register termination upon SIGINT and SIGTERM, and ignore SIGPIPE from clients.
     setup_signal_handling();
 
-    // Initialise timeout instance to be used across all connections.
+    // Initialise timeout instance to be used for receiving requests from each client.
     const struct timeval timeout = {.tv_sec = RECV_TIMEOUT_SECS, .tv_usec = 0};
 
-    // Define pthread attribute template to spawn pthreads detached.
+    // Define pthread attribute template to spawn pthreads detached by default.
     pthread_attr_t thread_attr;
     pthread_attr_init(&thread_attr);
     pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
@@ -97,6 +98,9 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
     }
 
     // No longer listening, clean-up the server.
+    // pthread attributes are copied into each thread, so it is safe to free the thread attributes instance, even if a
+    // thread runs before calling close(sockfd)
+    // https://pubs.opengroup.org/onlinepubs/009695399/functions/pthread_create.html (not code, just manpage).
     pthread_attr_destroy(&thread_attr);
     close(sockfd);
 
@@ -196,10 +200,27 @@ off_t send_fd_file(response_t *res, int client_sockfd) {
         bytes_left = res->body_size - bytes_sent_offset;
         // n's narrower type & the limit of SSIZE_MAX comes from sendfile sending at most SSIZE_MAX bytes per call.
         count = bytes_left > SSIZE_MAX ? SSIZE_MAX : bytes_left;
-        // Since sendfile can update the offset of the file descriptor, you should NOT pass in an offset variable,
-        // but instead let the offset be NULL. https://linux.die.net/man/2/sendfile
-        // If you erroneously pass in an offset, you will notice that the returned bytes_send_offset will be double the
-        // correct value, but the actual offset used by sendfile will grow exponentially, leading to failed downloads.
+
+        // Why sendfile()?
+        // sendfile() is more performant than the usual read() + send() loop. With read() + send(), we need a per thread
+        // userspace buffer which we have to copy from and to the kernel, as well as two system calls (thus two context
+        // switches) per iteration. Smaller per-thread userspace buffers significantly increase the number of iterations
+        // required. With sendfile(), all data copying from the file to the socket is done within the kernel space with
+        // an upper bound of half the number of system calls, and lower memory usage since there's no need for a
+        // per-thread userspace memory buffer. Furthermore, the kernel is free to employ any file-caching techniques
+        // e.g. when several clients are downloading the same large movie file, thus consolidating multiple clients'
+        // buffers into one and reducing disk I/O too. In practice, since the kernel cache memory is much larger than a
+        // thread's stack-allocated user-space buffer, the number of sendfile() calls is dramatically less than half the
+        // number of read()/send() calls, thus improving performance further. sendfile() also transparently handles the
+        // correct file offset when multiple sendfile() calls are needed (2GB limit per call) for large files, and we do
+        // not need think about choosing a buffer that fits within the stack or isn't too large for mallocing on the
+        // heap when there are many clients.
+
+        // Some implementation notes: since sendfile can update the offset of the file descriptor, you should NOT pass
+        // in an offset variable, but instead let the offset be NULL and let sendfile() update the fd's offset for you.
+        // https://linux.die.net/man/2/sendfile (not code, just manpage). If you erroneously pass in a non-null offset,
+        // you will notice that the returned bytes_send_offset will be double the correct value, but the actual offset
+        // used by sendfile will grow exponentially, leading to failed downloads on files >2GB.
         n = sendfile(client_sockfd, res->body_fd, NULL, count);
         if (n <= 0) {
             perror("sendfile: 200 entity-body error");

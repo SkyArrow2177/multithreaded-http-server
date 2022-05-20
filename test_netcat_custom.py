@@ -261,4 +261,5 @@ class TestNetcat(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    # print(FULL[2:31])
     unittest.main()
