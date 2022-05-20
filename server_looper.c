@@ -99,7 +99,7 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
 
     // No longer listening, clean-up the server.
     // pthread attributes are copied into each thread, so it is safe to free the thread attributes instance, even if a
-    // thread runs before calling close(sockfd)
+    // thread runs before calling close(sockfd) on the server's socket
     // https://pubs.opengroup.org/onlinepubs/009695399/functions/pthread_create.html (not code, just manpage).
     pthread_attr_destroy(&thread_attr);
     close(sockfd);
@@ -198,23 +198,24 @@ off_t send_fd_file(response_t *res, int client_sockfd) {
     ssize_t n;
     while (bytes_sent_offset < res->body_size) {
         bytes_left = res->body_size - bytes_sent_offset;
-        // n's narrower type & the limit of SSIZE_MAX comes from sendfile sending at most SSIZE_MAX bytes per call.
+        // n's narrower type & the limit of SSIZE_MAX comes from sendfile sending at most SSIZE_MAX bytes per call. With
+        // sendfile, there's no need to pass in an offset, but the max number of bytes to send should still be tracked.
         count = bytes_left > SSIZE_MAX ? SSIZE_MAX : bytes_left;
 
         // Why sendfile()?
-        // sendfile() is more performant than the usual read() + send() loop. With read() + send(), we need a per thread
-        // userspace buffer which we have to copy from and to the kernel, as well as two system calls (thus two context
-        // switches) per iteration. Smaller per-thread userspace buffers significantly increase the number of iterations
-        // required. With sendfile(), all data copying from the file to the socket is done within the kernel space with
-        // an upper bound of half the number of system calls, and lower memory usage since there's no need for a
-        // per-thread userspace memory buffer. Furthermore, the kernel is free to employ any file-caching techniques
-        // e.g. when several clients are downloading the same large movie file, thus consolidating multiple clients'
-        // buffers into one and reducing disk I/O too. In practice, since the kernel cache memory is much larger than a
-        // thread's stack-allocated user-space buffer, the number of sendfile() calls is dramatically less than half the
-        // number of read()/send() calls, thus improving performance further. sendfile() also transparently handles the
-        // correct file offset when multiple sendfile() calls are needed (2GB limit per call) for large files, and we do
-        // not need think about choosing a buffer that fits within the stack or isn't too large for mallocing on the
-        // heap when there are many clients, thus making the code a little simpler.
+        // sendfile() is more performant than the usual read() + send() loop. With read() + send(), we have to copy
+        // kernel memory from the file resource into a per-thread userspace buffer, then back to kernel memory, and in
+        // this process make two system calls (thus two context switches) per iteration. Smaller per-thread userspace
+        // buffers significantly increase the number of iterations required. With sendfile(), data from the source file
+        // descriptor is directly passed to the client socket entirely within the kernel space with an upper bound of
+        // half the number of system calls, and lower memory usage since there's no need for a per-thread userspace
+        // memory buffer. In practice, since the kernel cache memory buffer is much larger than a thread's
+        // stack-allocated user-space buffer, we can send more data per sendfile() call compared to the read+send
+        // solution, thus for a given file, the number of sendfile() calls is dramatically less than half the number of
+        // read()/send() calls, thus improving performance further. In terms of application code simplicity, sendfile()
+        // also transparently handles the correct file offset which is useful for handling large files (>2GB) where
+        // multiple sendfile() calls are required. There is also no need to think about choosing a buffer that fits
+        // within the stack or isn't too large for mallocing on the heap when there are many clients.
 
         // Some implementation notes: since sendfile can update the offset of the file descriptor, you should NOT pass
         // in an offset variable, but instead let the offset be NULL and let sendfile() update the fd's offset for you.
