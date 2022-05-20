@@ -30,6 +30,8 @@ int main(int argc, char *argv[]) {
     // Run the server.
     server_loop(s_protocol, s_port, s_root_path);
 
+    // Any detached threads will also be terminated when main returns:
+    // https://man7.org/linux/man-pages/man3/pthread_detach.3.html (not code, just manpage)
     return 0;
 }
 
@@ -41,7 +43,7 @@ unsigned long strtoul_strict(const char *str) {
     char *endptr;
     unsigned long val = strtoul(str, &endptr, base);
 
-    // Error scenarios are described at https://man7.org/linux/man-pages/man3/strtoul.3.html
+    // Error scenarios are described at https://man7.org/linux/man-pages/man3/strtoul.3.html (not code, just manpage).
     if ((errno == ERANGE && (val == ULONG_MAX || val == 0)) || (errno != 0 && val == 0)) {
         perror("strtoul_strict");
         exit(EXIT_FAILURE);
