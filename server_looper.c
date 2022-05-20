@@ -99,7 +99,7 @@ int server_loop(uint8_t s_protocol, const char *s_port, const char *s_root_path)
 
     // No longer listening, clean-up the server.
     // pthread attributes are copied into each thread, so it is safe to free the thread attributes instance, even if a
-    // thread runs before calling close(sockfd) on the server's socket
+    // thread runs before calling close(sockfd) on the server socket.
     // https://pubs.opengroup.org/onlinepubs/009695399/functions/pthread_create.html (not code, just manpage).
     pthread_attr_destroy(&thread_attr);
     close(sockfd);
@@ -250,7 +250,7 @@ static void termination_handler(int signum) {
     return;
 }
 
-// Registers signal handlers.
+// Register signal handlers.
 void setup_signal_handling() {
     // Register signal handler for termination.
     struct sigaction new_action;
