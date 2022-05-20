@@ -214,7 +214,7 @@ off_t send_fd_file(response_t *res, int client_sockfd) {
         // number of read()/send() calls, thus improving performance further. sendfile() also transparently handles the
         // correct file offset when multiple sendfile() calls are needed (2GB limit per call) for large files, and we do
         // not need think about choosing a buffer that fits within the stack or isn't too large for mallocing on the
-        // heap when there are many clients.
+        // heap when there are many clients, thus making the code a little simpler.
 
         // Some implementation notes: since sendfile can update the offset of the file descriptor, you should NOT pass
         // in an offset variable, but instead let the offset be NULL and let sendfile() update the fd's offset for you.
