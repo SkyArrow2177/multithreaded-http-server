@@ -16,7 +16,7 @@ uint8_t get_protocol(const char *str);
 char *get_root_path(char *path);
 void debug_server_input(uint8_t protocol, char *port, char *path);
 
-// Functions.
+// Entry point of the server. Validates arguments, then hands off to the looper for continuous request handling.
 int main(int argc, char *argv[]) {
     // Read arguments. Can assume well-formed provided arguments.
     if (argc != 4) {
