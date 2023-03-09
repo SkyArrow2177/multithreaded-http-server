@@ -1,0 +1,171 @@
+COMP30023 2022 Project 2 After Deadline Tests
+v12, last modified 22/05, hidden
+
+HEAD is now at 8791d22 cleanup: improve documentation for entry point
+Commit log:
+8791d22ab8e746653b06b36a5b8244dc970e824d: cleanup: improve documentation for entry point
+e811d2d81ca0e90f71070d1d7a58b85c6a03a5a5: cleanup: explain pthread_attrs
+ee4d71cb673b8867de74c6b6898c7cad9eae8c07: Merge branch 'main' of gitlab.eng.unimelb.edu.au:comp30023-2022-projects/icche/comp30023-2022-project-2 into main
+92a19c76c0928713d7c600e00ddd306521ff766f: cleanup: improve clarity of sendfile explanation
+e1f885646976d74d3aa9acaa999ff58bdbf3ca5d: cleanup: improve clarity of sendfile explanation
+64aa3db64cd1bfa3891350ba54d5f2937a950013: cleanup: clarify code simplicity
+e95beefdb18f185f6050a36217c79aa8926d5548: test: repurpose partial.txt notes as a test resource
+21eb0c4d67fe27f1d7c73b61f94763da7a97505d: cleanup: add sendfile() explanation
+91fc40b57627d07dbde792d82fb39169fb2f0227: http: add #defines for magic chars and strings
+0cae52014a340d8b69087108c1625b3905e2e903: cleanup: improved comments
+4be92708a22875fe01f5b2efc4d7a892cd6c94bf: server: additional signal handling for client SIGPIPE
+7c51a6e0b12a53ad5dccf3a43bf6b482a6681096: server: handle very large files with insane throughput!
+850118e0c62e2bcf76235012caf3bb68ea3ee63e: server: extract sending to function
+fb027406f206e4568b9a9d2c8886104173f0e4da: server: consolidate defines into makefile flags
+4dfe635716c66762dffdaaf685f5353e1f1c00b5: server_looper: loop over multiple addresses
+07a7d5813ba3d9dc6c003ee297a0938a5f69109f: Merge branch 'modular' into 'main'
+83a58343e2599fc2e295a4580c88422ff2fc9b7b: cleanup: remove unnecessary #includes with iwyu
+3ebce3d6ebbc5fdd627316db4d16e6e5f9e45989: server: split argument reading and loop into separate files
+90558a4943ce35caa63346202a340af45fc98bc9: cleanup: change ssize_t to int where range known
+fce39caadd5f4747a9cf7296581b6e1a5696a8e7: test: clean up netcat-based tests
+4c5925b94d01ec23db443d87d6cf7b9af8a9f87c: test: add 'not extension' tests
+5f61a3b3af0c6dd6592c66658406cc44c5e939c8: Merge branch 'threaded' into 'main'
+bfab8fef449e354eb17ab83bc49c1d4298364ee9: threads: spawn new pthread per accepted client
+ee24eba7092cea0c232eb4a289a30b05ac55f57d: thread: prepare Makefile for concurrency
+a07089e85becff4a32ae4ccfc5119cf95e2c594d: test: change gif test
+9b57a2d5f223db44bcda71dc59d3c1d543995cf3: Merge branch 'partial_recv_2' into 'main'
+47bd8f45776ae21150d842c388df8e7e6914dc67: http: reuse partial buffer computation for extracting uri
+fd1a2723cdc13058ec12b1a4de41ca3c359e24f8: http: replace strlen with pointer arithmetic
+e701e154d1ff72febd5dca4364af57390c1ff556: http: check for <CRLF><CRLF>
+d1e18fca265162ec0a30a2bf148c1551225c7489: server, test: netcat custom multi-packets, allow sending 400 on timeout EAGAIN/EWOULDBLOCK
+da3beda101648f7f6b838ef28d8775157919ec8c: tests: test many more well-formed get requests
+f26e176f419cebc80a39f310185793f746fcdb27: test: write tests for valid requests, including large files
+45b399ddfacc3d6d18b1a4f70b3ae39232513279: test: begin request testing
+cb4653907206b844ca1e09462355e61b75a6846c: http: partial recv support
+ffec94ccdc8068c2db45c9713337b7dbc8eede32: working: make partial recv pseudocode more concise
+dbf19d9d7816e27225c64d8274cda8cfa0ffa825: working: partial recv() pseudocode
+63c1aef55f479aba1f0cfc42aeef5784007ad298: http: add test executables to gitignore
+ec662c11eaccdc0ebd28877be546a053511adc3a: server: enable IPv6
+c19ec87283cce1723ec508a33592006964b021c1: server: return valid responses for single-packet requests. TODO: multi-packet partial recv validation.
+1dc61602c6bb3465c1b65f2d6b6f882150fa363d: http: uni test get_request_uri, fix pointer modification within functions
+11ffc390976788137ce818863f2977879fc19fac: server: send response to client
+04a44d40a3b919156f11fdb0211265f6dee2b3f9: http: complete response
+0bc8efa8aab85f3f046774dce10b1506cc0e024c: http: get path and mime, file open handling.
+85285acc12a1d32630fe761ec458ace98184796f: http: check for path escape
+1cf6ee0c67c5eaf465cc33eee8b06d960fc6a4b8: http: get request uri from valid Request-Line
+a9b694346b9e5b81124e403c5b01b7044d56137b: response: add response struct to store relevant info
+399ddf15ba8f723d0762873350ec5ee73be60866: server: client recv with timeout and graceful error handling
+075ca50836b9dfa4b83a1cacbb71322a0560ad29: server: accept connections; don't trim path since multiple slashes do not start new component.
+0d6bbc500549ce02e113055d31eae868c9cb50e0: server: add signal handling
+ef66a415b79e67521ac13b567560bd886695144e: server: fix protocol detection
+51567cdf91601314aaba002e06adf44a1437e5f7: server: open listening socket
+2366156c8740fcd21c08e51bfc93a3419f35412d: server: early exit on invalid arguments
+214301b53c632ef58c41d510a06136bb949614d2: git: add gitignore
+294879a964f7d78b898f92907ea3f5f9160311cc: init: server compilation
+dee66feda1728e51d7301139f965de6f6dff4403: init: add .gitlab-ci.yml
+
+make -B && make clean (output suppressed)
+
+make clean
+rm -f server *.o
+
+make
+gcc -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE=1 -D_POSIX_C_SOURCE=200112L -std=c99 -O2 -Wall -Werror=vla -pthread -DNDEBUG -g -o server server.c server_looper.h server_looper.c response.h response.c http.h http.c
+
+OK -- ./server found. Copying to clean working directory.
+IPV6: 1, CONCURRENCY: 1
+
+Visible Tests
+Task Input #1 ./server v 3000 /www/vis (0 marks): Passed.
+Task Input #2 ./server 8 3000 /www/vis (0 marks): Passed.
+Task Input #3 ./server 4 <repeated-bind> /www/vis (0 marks): Passed.
+Task Input #4 ./server 4 bad /www/vis (0 marks): Passed.
+Task Input #5 ./server 4 3000 /www/non-exist (0 marks): Passed.
+Task Input #6 ./server 4 3000 /www/vis/index.html (0 marks): Passed.
+Task 1 #7 get_index (0.5 marks): Passed.
+Task 1 #8 get_image (0.5 marks): Passed.
+Task 1 #9 get_missing (0.5 marks): Passed.
+Task 1 #10 get_makefile (0.5 marks): Passed.
+Task 2 #11 mime_index (0.5 marks): Passed.
+Task 2 #12 mime_unknown (0.5 marks): Passed.
+Task 2 #13 mime_image_subdir (0.5 marks): Passed.
+Task 2 #14 path_escape (0.5 marks): Passed.
+Task 3 #15 get_index_6 (0.25 marks): Passed.
+Task 3 #16 mime_index_6 (0.25 marks): Passed.
+Task 4 #17 stall_one (1 marks): Passed.
+
+Hidden Tests
+Task 1 #1 (ACK) (0.05 marks): Passed.
+Task 1 #2 no-headers (0.25 marks): Passed.
+Task 1 #3 rfc3986-unreserved (0.20 marks): Passed.
+Task 1C #4 connect-disconnect (0.100 marks): Passed.
+Task 1C #5 partial-get (0.075 marks): Passed.
+Task 1C #6 invalid-header-crlf (0.075 marks): Passed.
+Task 1C #7 nonprint1 (0.075 marks): Passed.
+Task 1C #8 nonprint2 (0.025 marks): Passed.
+Task 1C #9 omit-method (0.025 marks): Passed.
+Task 1C #10 invalid-header (0.025 marks): Passed.
+Task 1C #11 http-0.9 (0.050 marks): Passed.
+Task 1C #12 BREW (0.050 marks): Passed.
+Task 1 #13 2kB-request (0.25 marks): Passed.
+Task 1 #14 server-404 (0.25 marks): Passed.
+Task 1 #15 path-escape-middle (0.25 marks): Passed.
+Task 1 #16 inaccessible-file (0.25 marks): Passed.
+Task 2 #17 mime-js (0.250 marks): Passed.
+Task 2 #18 mime-css (0.250 marks): Passed.
+Task 2 #19 2G.bin (0.250 marks): Passed.
+Task 2 #20 .d (0.125 marks): Passed.
+Task 2 #21 d. (0.125 marks): Passed.
+Task 2 #22 mime-lecture (0.250 marks): Passed.
+Task 2 #23 ./ (0.250 marks): Passed.
+Task 2 #24 dir-contains-mime (0.125 marks): Passed.
+Task 2 #25 index.html.css (0.125 marks): Passed.
+Task 2 #26 ultra-long-path (0.250 marks): Passed.
+Task 3 #27 header-traversal (0.125 marks): Passed.
+Task 3 #28 missing-dotfile (0.125 marks): Passed.
+Task 3 #29 ... (0.125 marks): Passed.
+Task 3 #30 not-path-traversal (0.125 marks): Passed.
+Task 4 #31 long_parallel-2 (0.5 marks): Passed.
+Task 4 #32 long_parallel-5 (0.5 marks): Passed.
+Task 4 #33 long_short (0.5 marks): Passed.
+Task 2 #34 2GB_zeros.bin (0 marks): Passed.
+Task 4 #35 stall_extended (0.5 marks): Passed.
+
+Extra Tests
+Task Input #1 extra-./server 4 3000 /www/hidden/inaccessible-dir (0 marks): Passed.
+Task 1 #2 extra-path-escape-start (0 marks): Passed.
+Task 2 #3 extra-! (0 marks): Passed.
+Task 3 #4 extra-nested-404 (0 marks): Passed.
+Task 1C #5 extra-cr&lf (0 marks): Passed.
+Task 1C #6 extra-not-/-uri (0 marks): Passed.
+Task 1C #7 extra-missing-uri (0 marks): Passed.
+Task 1D #8 extra-directory (0 marks): Passed.
+Task 1D #9 extra-directory-escape-end (0 marks): Passed.
+
+Great that server specified Content-Length for 200 responses!
+
+Well done! You passed all tests.
+
+=============== Automated Grading Assumptions Below =================
+The automated test script assumes that your program will exit with status code of 0 if it successfully runs and terminates correctly.
+Re-examination Guidelines: If you'd like to have your assessment grade reviewed, you need to fill the grade review form.
+Do not email as it is very difficult to keep track of 500+ students using email, we prefer to have everything visible on a single spreadsheet.
+
+=============== START RESULTS TABLE ====================
+Task 1: Valid responses (IPv4)              4.000
+Task 2: MIME type (IPv4)                    4.000
+Task 3: Valid responses & MIME type (IPv6)  1.000
+Task 4: Concurrency                         3.0
+Task 5: Quality of software practices       1.5
+Task 6: Build quality                       1
+Project 2 (Total):                          14.5
+================ END RESULTS TABLE =====================
+Assessor comments:
+Excellent, descriptive commit messages
+No .h for .c or compilation not occurring in stages (-0.5)
+Well modularised
+Good, descriptive comments
+Do not include headers in compiler invocations.
+Congratulations on passing all the concurrency tests!
+Excellent work writing your own tests.
+I like that you have separated the request and response data types.
+Nice to see explicit signal handling and correct use of sig_atomic_t.
+Incremental parsing! Well done.
+This is outstanding work. Great job.
+Extra comments:
+Good to see implementation of timeout
