@@ -18,8 +18,8 @@
     - This server does not wait until a 2x CRLF is reached, which is the end of
       a HTTP request given by RFC 1945.
 
-  - Handles multi-packet requests: GET requests can be > 2KB in size
-    (configurable), which is larger than a typical MTU.
+- **Incrementally parses the request line** by tracking the last-completed stage
+  in per-request state machine, improving request processing performance.
 
 - Handles **multiple simultaneous downloads** up to the process thread limit
   through the use of a dedicated POSIX thread per request.
@@ -28,8 +28,15 @@
     per-process thread limit. Implementing green threads would be a further
     challenge!
 
-- **Incrementally parses the request line** by tracking the last-completed stage
-  in per-request state machine, improving request processing performance.
+- **Supports both IPv4 and IPv6!** It _is_ 2022 already.
+
+- **Handles multi-packet requests**: HTTP requests can be > 2KB in size
+  (configurable), which is larger than a typical MTU.
+
+- **Request and response types to encapsulate data, ensure separation of the
+  request-parsing and response-building concerns, and improve readability**.
+  Response side-effects are performed only when the response struct has been
+  fully populated.
 
 - **Supports large files (larger than 2 GiB)** - file sizes are limited only by
   the maximum supported by the file system (ext4: 16 TiB).
@@ -52,10 +59,13 @@
 
 - **Supports timeouts** on incomplete, idle requests.
 
+- **No 3rd party dependencies.** Uses only the C POSIX library.
+
 - Runs on amd64 Linux (any 64-bit CPU & Linux distribution should work,
   including arm64 CPUs).
 
-- **Tests** written in Python 3 (version 3.7+ required).
+- **Tests for well-formed and invalid requests written in Python 3** (version
+  3.7+ required).
 
 ## Building
 
