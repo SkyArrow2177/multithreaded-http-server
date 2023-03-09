@@ -78,8 +78,10 @@
 
 A comprehensive list of test results is attached in `proj2-final.txt`. Note that
 these results and the comments are directed at commit SHA
-`8791d22ab8e746653b06b36a5b8244dc970e824d` - I've added a readme and improved
-the Makefile since, with no changes to the server functionality.
+`20039d3df71cac80e9b33fa6e444169040cdaf91` - I've added a readme and improved
+the Makefile since, with no changes to the server functionality. The commit SHAs
+do not match those in `proj2-final.txt` after updating my git author email using
+`git filter-repo`.
 
 Clearly, these tests that I wrote weren't for naught!
 
