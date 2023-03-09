@@ -2,7 +2,7 @@
 
 ## Features
 
-- Supports HTTP/1.0 and HTTP/1.1 GET requests for static files.
+- **Supports HTTP/1.0 and HTTP/1.1 GET requests** for static files.
 
   - Implements a subset of the HTTP/1.0 specification.
   - HTTP/1.1 is accepted in the request line for convenience as modern browsers
@@ -21,41 +21,41 @@
   - Handles multi-packet requests: GET requests can be > 2KB in size
     (configurable), which is larger than a typical MTU.
 
-- Handles multiple simultaneous downloads up to the process thread limit through
-  the use of a dedicated POSIX thread per request.
+- Handles **multiple simultaneous downloads** up to the process thread limit
+  through the use of a dedicated POSIX thread per request.
 
   - To improve on this further, a thread pool could be used to avoid the
     per-process thread limit. Implementing green threads would be a further
     challenge!
 
-- Incrementally parses the request line by tracking the last-completed stage in
-  per-request state machine, improving request processing performance.
+- **Incrementally parses the request line** by tracking the last-completed stage
+  in per-request state machine, improving request processing performance.
 
-- Supports large files (larger than 2 GiB) - file sizes are limited only by the
-  maximum supported by the file system (ext4: 16 TiB).
+- **Supports large files (larger than 2 GiB)** - file sizes are limited only by
+  the maximum supported by the file system (ext4: 16 TiB).
 
-- Performs zero-copy transfers from a file to the response socket using
+- **Performs zero-copy transfers from a file to the response socket** using
   `sendfile`, reaching local download speeds to in excess of 3 GB/s on large
   files, saturating the read speed of a PCIe 3.0 NVMe SSD where the test files
   are located!
 
-- Protects against path escape attacks involving `/../` or trailing `/..`, while
-  also accepting and processing potentially-legitimate paths such as
+- **Protects against path escape attacks** involving `/../` or trailing `/..`,
+  while also accepting and processing potentially-legitimate paths such as
   `/folder../`
 
-- Supports extremely long path names up to the system's max limits (255 chars
-  per file folder, 4096 chars for the entire path on Linux).
+- **Supports extremely long path names** up to the system's max limits (255
+  chars per file folder, 4096 chars for the entire path on Linux).
 
-- Safe signal handling with correct use of `sig_atomic_t` - for example,
+- **Safe signal handling** with correct use of `sig_atomic_t` - for example,
   keyboard interrupts sent through `netcat` will not remotely terminate the
   running server.
 
-- Timeouts on partial idle requests.
+- **Supports timeouts** on incomplete, idle requests.
 
 - Runs on amd64 Linux (any 64-bit CPU & Linux distribution should work,
   including arm64 CPUs).
 
-- Tests written in Python 3 (version 3.7+ required).
+- **Tests** written in Python 3 (version 3.7+ required).
 
 ## Building
 
