@@ -17,3 +17,5 @@ jobs:
     - uses: actions/checkout@v3
     - name: make
       run: make
+    - name: start
+      run: timeout --preserve-status -v 3 ./server 4 9000 ./www1
