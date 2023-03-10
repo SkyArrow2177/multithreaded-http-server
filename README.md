@@ -72,7 +72,22 @@
 1. Clone this repository.
 2. `make`
 
+## Running
+
+`./server [protocol number] [port number] [path to web root]`
+
+- `[protocol number]`: 4 for IPv4 or 6 for IPv6
+- `[port number]` is a valid port number (8080, 9000, etc). Avoid using the
+  well-known ports of 0-1023 inclusive, as they are reserved for the host OS and
+  core services, and typically cannot be bound to without root access.
+- `[path to web root]` is a valid path e.g. `./www1` if the current directory is
+  the root of this repo.
+
 ## Testing
+
+Before running any provided unit tests, stop any instance which has been bound
+to the same port (9000) to be used by the server instance launched during unit
+test setup.
 
 ### Test results
 
