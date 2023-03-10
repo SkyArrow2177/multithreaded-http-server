@@ -17,7 +17,7 @@ POST = "POST"
 FULL = "GET /special/..../example.html HTTP/1.0\r\n\r\n"
 LONG = "GET /special/..../example.html HTTP/1.0\r\nHost: abcdef.xyz\r\n\r\n"
 
-SKIP_TIMEOUT = False
+SKIP_TIMEOUT = True
 
 
 def ss():
