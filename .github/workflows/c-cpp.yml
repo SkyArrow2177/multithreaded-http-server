@@ -2,20 +2,34 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
-    
+    branches: ["main"]
+
   workflow_dispatch:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: make
-      run: make
-    - name: start
-      run: timeout --preserve-status -v 3 ./server 4 9000 ./www1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+          cache: "pip"
+
+      - name: make
+        run: make
+
+      - name: test_start
+        run: timeout --preserve-status -v 3 ./server 4 9000 ./www1
+
+      - name: test_deps
+        run: pip install -r requirements.txt
+
+      - name: test_netcat_custom
+        run: python test_netcat_custom.py
+
+      - name: test_valid_requests
+        run: python test_valid_requests.py
