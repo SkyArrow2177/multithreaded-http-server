@@ -1,4 +1,4 @@
-# Multithreaded HTTP/1.0 server in C
+# Multithreaded HTTP/1.0 server in C with IPv6 support
 
 ## Features
 
@@ -9,14 +9,30 @@
     default to this version string.
   - Only the request line needs to be well-formed.
 
-    - This server does not require nor read any further request headers.
+    - This server does not require, process, nor validate any further request
+      headers.
 
-    - Therefore, when reading the GET request, as long as a single `CRLF` is
-      encountered at the end of a valid request line, the request will be
-      immediately accepted and processed.
+    - Therefore, when reading the HTTP GET request, once a single `CRLF` is
+      encountered at the end of a valid request line, the request parser state
+      machine will transition to looking for 2x consecutive `CRLF`, which marks
+      the end of a HTTP request as specified in RFC 1945.
 
-    - This server does not wait until a 2x CRLF is reached, which is the end of
-      a HTTP request given by RFC 1945.
+      - The first `CRLF` of the 2x `CRLF` marking the request's end can also be
+        the `CRLF` at the end of a valid request line. Thus a single request has
+        a minimum of 2x `CRLF` in total, with 2 of these `CRLF`s being
+        consecutive at the end of the request.
+
+    - Since further request headers are unused, an alternative approach is
+      possible as follows:
+
+      - When reading the GET request, once a `CRLF` is encountered at the end of
+        a valid request line, the request would be immediately accepted and
+        processed.
+
+      - This alternative approach would hence not wait until 2x consecutive
+        `CRLF`s are reached (which would mark the end of a HTTP request as given
+        by RFC 1945), thus marginally reducing latency (round-trip time) by
+        replying earlier to requests with many additional headers.
 
 - **Incrementally parses the request line** by tracking the last-completed stage
   in per-request state machine, improving request processing performance.
